@@ -323,16 +323,27 @@ exports.assignCabBooking = async (req, res, next) => {
     // Notify Driver (if they are online)
     const io = req.app.get('io');
     if (io) {
-      io.to(`provider_${vendor.driverId.toString()}`).emit('ride_assigned', {
-        bookingId: booking._id,
-        pickupLocation: booking.cabBooking.pickupLocation,
-        dropLocation: booking.cabBooking.dropLocation
-      });
+      if (vendor.driverId) {
+        io.to(`provider_${vendor.driverId.toString()}`).emit('ride_assigned', {
+          bookingId: booking._id,
+          pickupLocation: booking.cabBooking.pickupLocation,
+          dropLocation: booking.cabBooking.dropLocation
+        });
+      }
+      if (vendor.providerId) {
+        io.to(`provider_${vendor.providerId.toString()}`).emit('ride_assigned', {
+          bookingId: booking._id,
+          pickupLocation: booking.cabBooking.pickupLocation,
+          dropLocation: booking.cabBooking.dropLocation
+        });
+      }
       // Also notify customer
-      io.to(`user_${booking.userId.toString()}`).emit('ride_accepted', {
-        bookingId: booking._id,
-        driverInfo: vendor.vendorDetails
-      });
+      if (booking.userId) {
+        io.to(`user_${booking.userId.toString()}`).emit('ride_accepted', {
+          bookingId: booking._id,
+          driverInfo: vendor.vendorDetails
+        });
+      }
     }
 
     res.status(200).json({ success: true, message: 'Cab successfully assigned', booking });

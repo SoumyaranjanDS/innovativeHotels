@@ -63,9 +63,9 @@ const HotelBookingConfirmation = () => {
         {/* Cab Suggestion */}
         {hb && (
           <HotelCabSuggestion 
-            hotelId={hb.hotelId?._id} 
-            hotelBookingId={hb._id} 
-            hotelAddress={`${hb.hotelId?.address?.street || ''}, ${hb.hotelId?.address?.city || ''}`} 
+            hotelId={hb.hotelId} 
+            hotelBookingId={booking._id} 
+            hotelAddress={`${booking.hotelAddress}, ${booking.hotelCity}`.replace(/^,\s/, '')} 
           />
         )}
 

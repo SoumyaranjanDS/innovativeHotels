@@ -98,6 +98,7 @@ exports.createCabBooking = async (req, res) => {
         hotelBookingId,
         hotelId,
         cabSourcePreference: cabSourcePreference || 'ANY',
+        cabSourceType: cabSourcePreference === 'HOTEL_LINKED' ? 'HOTEL_LINKED' : 'INDEPENDENT',
         pickupLocation,
         dropLocation,
         pickupDateTime,

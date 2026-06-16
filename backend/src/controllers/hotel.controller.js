@@ -58,10 +58,17 @@ exports.searchHotels = async (req, res) => {
             const avail = await HotelAvailability.findOne({
               hotelId: h._id, roomId: room._id, date
             });
-            if (!avail || avail.isBlocked ||
-              (avail.totalRooms - avail.bookedRooms - avail.heldRooms) < roomsNeeded) {
-              isAvailable = false;
-              break;
+            if (avail) {
+              if (avail.isBlocked || (avail.totalRooms - avail.bookedRooms - avail.heldRooms) < roomsNeeded) {
+                isAvailable = false;
+                break;
+              }
+            } else {
+              // If no availability record exists, it means 0 bookings/holds.
+              if (room.totalRooms < roomsNeeded) {
+                isAvailable = false;
+                break;
+              }
             }
           }
           if (isAvailable) availableRooms.push(room);
@@ -143,15 +150,21 @@ exports.getHotelDetail = async (req, res) => {
           const avail = await HotelAvailability.findOne({
             hotelId: hotel._id, roomId: room._id, date
           });
-          if (!avail || avail.isBlocked) {
-            available = false;
-            minAvailable = 0;
-            break;
+          if (avail) {
+            if (avail.isBlocked) {
+              available = false;
+              minAvailable = 0;
+              break;
+            }
+            const free = avail.totalRooms - avail.bookedRooms - avail.heldRooms;
+            if (free < needed) available = false;
+            minAvailable = Math.min(minAvailable, free);
+            pricePerNight = avail.finalPrice || room.price;
+          } else {
+            // No record means fully available
+            if (room.totalRooms < needed) available = false;
+            minAvailable = Math.min(minAvailable, room.totalRooms);
           }
-          const free = avail.totalRooms - avail.bookedRooms - avail.heldRooms;
-          if (free < needed) available = false;
-          minAvailable = Math.min(minAvailable, free);
-          pricePerNight = avail.finalPrice || room.price;
         }
 
         return {
@@ -209,21 +222,32 @@ exports.checkAvailability = async (req, res) => {
     let totalPrice = 0;
     let available = true;
 
+    const room = await Room.findById(roomId);
+    if (!room) return res.status(404).json({ success: false, message: 'Room not found' });
+
     for (const date of stayDates) {
       const avail = await HotelAvailability.findOne({ hotelId, roomId, date });
-      if (!avail || avail.isBlocked) {
-        available = false;
-        break;
+      if (avail) {
+        if (avail.isBlocked) {
+          available = false;
+          break;
+        }
+        const free = avail.totalRooms - avail.bookedRooms - avail.heldRooms;
+        if (free < needed) {
+          available = false;
+          break;
+        }
+        totalPrice += avail.finalPrice * needed;
+      } else {
+        if (room.totalRooms < needed) {
+          available = false;
+          break;
+        }
+        totalPrice += room.price * needed;
       }
-      const free = avail.totalRooms - avail.bookedRooms - avail.heldRooms;
-      if (free < needed) {
-        available = false;
-        break;
-      }
-      totalPrice += avail.finalPrice * needed;
     }
 
-    const room = await Room.findById(roomId);
+    // Room is already fetched above
     const taxAmount = Math.round(totalPrice * (room?.taxPercent || 18) / 100);
     const discountAmount = Math.round(totalPrice * (room?.discountPercent || 0) / 100);
 
@@ -262,9 +286,23 @@ exports.holdRoom = async (req, res) => {
     let totalBasePrice = 0;
 
     for (const date of dates) {
-      const availability = await HotelAvailability.findOne({ hotelId, roomId, date }).session(session);
+      let availability = await HotelAvailability.findOne({ hotelId, roomId, date }).session(session);
 
-      if (!availability) throw new Error(`Availability not configured for ${date.toLocaleDateString()}`);
+      if (!availability) {
+        // Create availability record on the fly
+        availability = new HotelAvailability({
+          hotelId,
+          roomId,
+          date,
+          totalRooms: room.totalRooms,
+          bookedRooms: 0,
+          heldRooms: 0,
+          basePrice: room.price,
+          finalPrice: room.price,
+          isBlocked: false
+        });
+        await availability.save({ session });
+      }
       if (availability.isBlocked) throw new Error(`Room blocked for ${date.toLocaleDateString()}`);
 
       const availableCount = availability.totalRooms - availability.bookedRooms - availability.heldRooms;

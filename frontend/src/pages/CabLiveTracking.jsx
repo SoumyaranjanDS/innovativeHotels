@@ -4,6 +4,7 @@ import { useLoadScript, GoogleMap, DirectionsRenderer, Marker } from '@react-goo
 import { io } from 'socket.io-client';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
+import { CheckCircle } from 'lucide-react';
 
 const libraries = ['places'];
 const mapContainerStyle = { width: '100%', height: '100%' };
@@ -94,9 +95,18 @@ const CabLiveTracking = () => {
         {status === 'requested' && (
           <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
             <div className="bg-white p-8 rounded-2xl shadow-xl text-center space-y-4">
-              <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-              <h3 className="text-xl font-bold">Finding nearby drivers...</h3>
-              <p className="text-gray-500 max-w-sm">Please wait while we match you with the best available cab near your pickup location.</p>
+              <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={32} />
+              </div>
+              <h3 className="text-xl font-bold">Request Received</h3>
+              <p className="text-gray-500 max-w-sm mb-6">Your cab request has been sent to the hotel. They will manually assign a driver before your pickup time.</p>
+              
+              <button 
+                onClick={() => window.location.href = '/dashboard'}
+                className="w-full mt-4 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
+              >
+                Go to My Bookings
+              </button>
             </div>
           </div>
         )}

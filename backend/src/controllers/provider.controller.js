@@ -336,8 +336,7 @@ exports.updateHotelBookingStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, reason } = req.body;
-    
-    if (!['confirmed', 'rejected'].includes(status)) {
+    if (!['confirmed', 'rejected', 'checked_in', 'completed'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid status update.' });
     }
 
@@ -353,13 +352,17 @@ exports.updateHotelBookingStatus = async (req, res) => {
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
     
-    if (booking.hotelBooking.status !== 'pending_approval') {
-      return res.status(400).json({ success: false, message: 'Only pending_approval bookings can be updated here.' });
+    const currentStatus = booking.hotelBooking.status;
+
+    if (!['pending_approval', 'confirmed', 'checked_in'].includes(currentStatus)) {
+      return res.status(400).json({ success: false, message: `Cannot update booking from ${currentStatus} state.` });
     }
 
     if (status === 'confirmed') {
+      if (currentStatus !== 'pending_approval') return res.status(400).json({ success: false, message: 'Invalid state transition to confirmed' });
       booking.hotelBooking.status = 'confirmed';
     } else if (status === 'rejected') {
+      if (currentStatus !== 'pending_approval') return res.status(400).json({ success: false, message: 'Invalid state transition to rejected' });
       booking.hotelBooking.status = 'rejected';
       booking.hotelBooking.rejectionReason = reason || 'Rejected by hotel';
       
@@ -376,6 +379,56 @@ exports.updateHotelBookingStatus = async (req, res) => {
       if (booking.paymentStatus === 'paid') {
         booking.paymentStatus = 'refund_initiated';
       }
+    } else if (status === 'checked_in') {
+      if (currentStatus !== 'confirmed') return res.status(400).json({ success: false, message: 'Booking must be confirmed before checking in' });
+      booking.hotelBooking.status = 'checked_in';
+      
+      // Auto-complete any pickup cabs that are still active
+      const activePickupCabs = await Booking.find({
+        bookingType: 'CAB',
+        'cabBooking.hotelBookingId': booking._id,
+        'cabBooking.tripType': 'pickup_to_hotel',
+        'cabBooking.status': { $in: ['assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'] }
+      });
+      
+      for (let cabBooking of activePickupCabs) {
+        cabBooking.cabBooking.status = 'completed';
+        cabBooking.cabBooking.completedAt = new Date();
+        await cabBooking.save();
+        
+        if (cabBooking.cabBooking.assignedCabProviderId) {
+          const CabVendor = require('../models/CabVendor');
+          await CabVendor.findByIdAndUpdate(cabBooking.cabBooking.assignedCabProviderId, {
+            'availability.isAvailable': true
+          });
+        }
+      }
+      
+    } else if (status === 'completed') {
+      if (currentStatus !== 'checked_in') return res.status(400).json({ success: false, message: 'Booking must be checked in before completing' });
+      booking.hotelBooking.status = 'completed';
+      
+      // Auto-complete any remaining associated cabs (just in case they were left hanging)
+      const activeCabs = await Booking.find({
+        bookingType: 'CAB',
+        'cabBooking.hotelBookingId': booking._id,
+        'cabBooking.status': { $in: ['assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'] }
+      });
+      
+      for (let cabBooking of activeCabs) {
+        cabBooking.cabBooking.status = 'completed';
+        cabBooking.cabBooking.completedAt = new Date();
+        await cabBooking.save();
+        
+        if (cabBooking.cabBooking.assignedCabProviderId) {
+          const CabVendor = require('../models/CabVendor');
+          await CabVendor.findByIdAndUpdate(cabBooking.cabBooking.assignedCabProviderId, {
+            'availability.isAvailable': true
+          });
+        }
+      }
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid status requested' });
     }
 
     await booking.save();

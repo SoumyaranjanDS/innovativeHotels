@@ -107,6 +107,8 @@ const ProviderHotelBookings = () => {
                 {bookings.map((b) => {
                   const hb = b.hotelBooking;
                   const isPending = hb?.status === 'pending_approval';
+                  const isConfirmed = hb?.status === 'confirmed';
+                  const isCheckedIn = hb?.status === 'checked_in';
                   return (
                     <tr key={b._id} className="border-b border-gray-100 hover:bg-gray-50 transition">
                       <td className="p-4 font-mono text-sm text-gray-600">
@@ -149,6 +151,16 @@ const ProviderHotelBookings = () => {
                               Reject
                             </button>
                           </>
+                        )}
+                        {isConfirmed && (
+                          <button disabled={actionLoading === b._id} onClick={() => handleStatusUpdate(b._id, 'checked_in')} className={`text-sm bg-purple-500 text-white px-3 py-1.5 rounded font-semibold hover:bg-purple-600 transition ${actionLoading === b._id ? 'opacity-50' : ''}`}>
+                            Check-In
+                          </button>
+                        )}
+                        {isCheckedIn && (
+                          <button disabled={actionLoading === b._id} onClick={() => handleStatusUpdate(b._id, 'completed')} className={`text-sm bg-blue-500 text-white px-3 py-1.5 rounded font-semibold hover:bg-blue-600 transition ${actionLoading === b._id ? 'opacity-50' : ''}`}>
+                            Check-Out
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -222,6 +234,16 @@ const ProviderHotelBookings = () => {
                     Approve Booking
                   </button>
                 </>
+              )}
+              {selectedBooking.hotelBooking?.status === 'confirmed' && (
+                <button onClick={() => handleStatusUpdate(selectedBooking._id, 'checked_in')} disabled={actionLoading === selectedBooking._id} className={`bg-purple-500 text-white px-8 py-2 rounded font-bold hover:bg-purple-600 shadow-md transition ${actionLoading === selectedBooking._id ? 'opacity-50' : ''}`}>
+                  Mark as Checked-In
+                </button>
+              )}
+              {selectedBooking.hotelBooking?.status === 'checked_in' && (
+                <button onClick={() => handleStatusUpdate(selectedBooking._id, 'completed')} disabled={actionLoading === selectedBooking._id} className={`bg-blue-500 text-white px-8 py-2 rounded font-bold hover:bg-blue-600 shadow-md transition ${actionLoading === selectedBooking._id ? 'opacity-50' : ''}`}>
+                  Check-Out Guest
+                </button>
               )}
               <button onClick={() => setShowDetailsModal(false)} className="bg-gray-200 text-gray-800 px-6 py-2 rounded font-bold hover:bg-gray-300 transition">
                 Close

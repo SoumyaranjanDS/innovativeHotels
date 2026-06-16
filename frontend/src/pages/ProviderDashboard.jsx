@@ -265,10 +265,12 @@ const ProviderDashboard = () => {
           </div>
         )}
 
-        {activeService === 'cab' && (
-          <div className="space-y-12">
-            {/* Hotel Cabs Section */}
-            <div className="border-t border-gray-100 pt-12">
+        {(activeService === 'cab' || (activeService === 'hotel' && isHotelActive && hotel?.isApproved)) && (
+          <div className={`space-y-12 ${activeService === 'hotel' ? 'mt-12 border-t-2 border-dashed border-gray-200 pt-8' : ''}`}>
+            
+            {/* Hotel Cabs Section - Only show in Cab tab */}
+            {activeService === 'cab' && (
+              <div className="border-t border-gray-100 pt-12">
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-xl font-bold text-gray-800">
@@ -309,9 +311,10 @@ const ProviderDashboard = () => {
                 </div>
               )}
             </div>
+            )}
 
             {/* Cab Requests Section */}
-            <div className="border-t border-gray-100 pt-12 mt-12">
+            <div className={`${activeService === 'cab' ? 'border-t border-gray-100 pt-12 mt-12' : ''}`}>
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-xl font-bold text-gray-800">Pending Cab Requests</h3>

@@ -27,7 +27,20 @@ const HotelCabSuggestion = ({ hotelId, hotelBookingId, hotelAddress }) => {
   const [cabSourcePref, setCabSourcePref] = useState('ANY');
 
   const pickupRef = useRef();
+  const dropRef = useRef();
   const navigate = useNavigate();
+
+  const handleDropPlaceChanged = () => {
+    const place = dropRef.current.getPlace();
+    if (place && place.geometry) {
+      setDrop({
+        address: place.formatted_address,
+        placeId: place.place_id,
+        lat: place.geometry.location.lat(),
+        lng: place.geometry.location.lng()
+      });
+    }
+  };
 
   const handlePlaceChanged = () => {
     const place = pickupRef.current.getPlace();
@@ -114,15 +127,21 @@ const HotelCabSuggestion = ({ hotelId, hotelBookingId, hotelAddress }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-indigo-900 mb-1">Drop Location (Auto-filled)</label>
+          <label className="block text-sm font-medium text-indigo-900 mb-1">Drop Location</label>
           <div className="relative">
-            <Navigation className="absolute left-3 top-3 text-gray-400" size={18} />
-            <input 
-              type="text" 
-              readOnly
-              value={drop.address}
-              className="w-full pl-10 p-3 border border-gray-200 rounded-xl bg-gray-100 text-gray-600 outline-none"
-            />
+            <Navigation className="absolute left-3 top-3 text-indigo-400" size={18} />
+            <Autocomplete
+              onLoad={(autocomplete) => { dropRef.current = autocomplete; }}
+              onPlaceChanged={handleDropPlaceChanged}
+            >
+              <input 
+                type="text" 
+                value={drop.address}
+                onChange={(e) => setDrop({ ...drop, address: e.target.value })}
+                placeholder="Where are you going?"
+                className="w-full pl-10 p-3 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white"
+              />
+            </Autocomplete>
           </div>
         </div>
 

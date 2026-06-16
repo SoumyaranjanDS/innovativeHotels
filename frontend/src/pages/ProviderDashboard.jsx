@@ -1,32 +1,76 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import api from '../api/axios';
+import { toast } from 'react-toastify';
+import { useAuth } from '../context/AuthContext';
 
 const ProviderDashboard = () => {
   const { activeService } = useOutletContext();
+  const { user } = useAuth();
   const [status, setStatus] = useState(null);
   const [hotel, setHotel] = useState(null);
   const [rooms, setRooms] = useState([]);
+  const [hotelCabs, setHotelCabs] = useState([]);
+  const [hotelCabBookings, setHotelCabBookings] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [fareRules, setFareRules] = useState([]);
+  const [metrics, setMetrics] = useState({ totalRevenue: '0.00', activeBookings: 0, pendingRequests: 0 });
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
-  // Room Form State
-  const [roomForm, setRoomForm] = useState({ roomType: '', occupancy: 2, price: 0, totalRooms: 1 });
+  // Cab Details Modal
+  const [selectedCab, setSelectedCab] = useState(null);
+  const [showCabDetails, setShowCabDetails] = useState(false);
+  const [isEditingCab, setIsEditingCab] = useState(false);
+  const [editCabForm, setEditCabForm] = useState(null);
+  const [editCabUploading, setEditCabUploading] = useState(false);
+
+  // Cab Assignment
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedCabRequest, setSelectedCabRequest] = useState(null);
+  const [assignFormData, setAssignFormData] = useState({ vendorId: '' });
+  const [assigningLoading, setAssigningLoading] = useState(false);
 
   const fetchData = async () => {
     try {
       const statusRes = await api.get('/providers/status');
       setStatus(statusRes.data.data || statusRes.data.profile);
 
+      try {
+        const metricsRes = await api.get('/providers/metrics');
+        setMetrics(metricsRes.data.metrics);
+      } catch(e) { console.error("Error fetching metrics"); }
+
       if (activeService === 'hotel') {
         try {
           const hotelRes = await api.get('/providers/hotel');
           setHotel(hotelRes.data.hotel);
-          if (hotelRes.data.hotel && hotelRes.data.hotel.isApproved) {
-            const roomsRes = await api.get('/providers/rooms');
-            setRooms(roomsRes.data.rooms);
-          }
         } catch (e) {
           console.log("No hotel found or error fetching hotel");
+        }
+      }
+      
+      // Always fetch hotel cabs to display in cab tab
+      try {
+        const cabsRes = await api.get('/hotel-cabs');
+        setHotelCabs(cabsRes.data.cabs);
+        if (cabsRes.data.vehicles) {
+          setVehicles(cabsRes.data.vehicles);
+        }
+        if (cabsRes.data.fareRules) {
+          setFareRules(cabsRes.data.fareRules);
+        }
+      } catch (e) {
+        console.log("No hotel cabs yet");
+      }
+
+      // Fetch hotel cab bookings
+      if (activeService === 'cab' || activeService === 'hotel') {
+        try {
+          const bookingsRes = await api.get('/hotel-cabs/bookings');
+          setHotelCabBookings(bookingsRes.data.data);
+        } catch (e) {
+          console.log("Error fetching hotel cab bookings");
         }
       }
     } catch (error) {
@@ -40,14 +84,72 @@ const ProviderDashboard = () => {
     fetchData();
   }, [activeService]);
 
-  const handleAddRoom = async (e) => {
-    e.preventDefault();
+  const handleDeleteCab = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this cab?')) return;
     try {
-      await api.post('/providers/rooms', roomForm);
-      setRoomForm({ roomType: '', occupancy: 2, price: 0, totalRooms: 1 });
-      fetchData(); // Refresh rooms
+      await api.delete(`/hotel-cabs/${id}`);
+      toast.success('Cab deleted successfully');
+      setShowCabDetails(false);
+      fetchData();
     } catch (error) {
-      console.error("Failed to add room", error);
+      toast.error(error.response?.data?.message || 'Failed to delete cab');
+    }
+  };
+
+  const handleUpdateCab = async (e) => {
+    e.preventDefault();
+    setEditCabUploading(true);
+    try {
+      const payload = {
+        driverDetails: {
+          driverName: editCabForm.vendorDetails.driverName,
+          mobile: editCabForm.vendorDetails.mobile,
+          email: editCabForm.vendorDetails.email,
+          address: editCabForm.vendorDetails.address
+        },
+        vehicleDetails: {
+          vehicleType: editCabForm.vehicleDetails.vehicleType,
+          model: editCabForm.vehicleDetails.model,
+          registrationNumber: editCabForm.vehicleDetails.registrationNumber
+        },
+        fareSetup: {
+          baseFare: editCabForm.fareSetup.baseFare,
+          perKmRate: editCabForm.fareSetup.perKmRate
+        }
+      };
+      
+      await api.put(`/hotel-cabs/${selectedCab._id}`, payload);
+      toast.success('Cab updated successfully');
+      setIsEditingCab(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update cab');
+    } finally {
+      setEditCabUploading(false);
+    }
+  };
+
+  const handleAssignDriver = async (e) => {
+    e.preventDefault();
+    if (!assignFormData.vendorId) {
+      toast.error('Please select a driver');
+      return;
+    }
+    setAssigningLoading(true);
+    try {
+      const selectedVehicle = vehicles.find(v => v.vendorId === assignFormData.vendorId);
+      const vehicleId = selectedVehicle ? selectedVehicle._id : null;
+      await api.patch(`/hotel-cabs/bookings/${selectedCabRequest._id}/assign`, {
+        vendorId: assignFormData.vendorId,
+        vehicleId: vehicleId
+      });
+      toast.success('Driver assigned successfully');
+      setShowAssignModal(false);
+      fetchData(); // Refresh bookings
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to assign driver');
+    } finally {
+      setAssigningLoading(false);
     }
   };
 
@@ -66,15 +168,15 @@ const ProviderDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 text-sm font-medium mb-1">Today's Revenue</h3>
-          <p className="text-3xl font-bold text-gray-900">₹0.00</p>
+          <p className="text-3xl font-bold text-gray-900">₹{metrics.totalRevenue}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 text-sm font-medium mb-1">Active Bookings</h3>
-          <p className="text-3xl font-bold text-gray-900">0</p>
+          <p className="text-3xl font-bold text-gray-900">{metrics.activeBookings}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 text-sm font-medium mb-1">Pending Requests</h3>
-          <p className="text-3xl font-bold text-gray-900">0</p>
+          <p className="text-3xl font-bold text-gray-900">{metrics.pendingRequests}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 text-sm font-medium mb-1">Profile Status</h3>
@@ -97,21 +199,29 @@ const ProviderDashboard = () => {
           </div>
         )}
 
-        {showCabOnboarding && (
-          <div className="text-center m-auto">
-            <div className="text-6xl mb-4">🚕</div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">No Vehicles Registered</h2>
-            <p className="text-gray-500 mb-6 max-w-md mx-auto">You haven't added any cab services yet. Complete the onboarding to start receiving ride requests.</p>
-            <Link to="/provider/onboarding/cab" className="bg-primary text-white px-6 py-3 rounded-md font-semibold hover:bg-primary-light transition shadow-md">
-              Start Cab Onboarding
-            </Link>
-          </div>
-        )}
+
 
         {activeService === 'hotel' && isHotelActive && (
           <div>
             {!hotel ? (
               <div className="p-8 text-center">Loading hotel details...</div>
+            ) : hotel.status === 'rejected' ? (
+              <div className="text-center m-auto py-12">
+                <div className="text-6xl mb-4">❌</div>
+                <h2 className="text-3xl font-bold text-red-600 mb-4">Hotel Profile Rejected</h2>
+                <p className="text-lg text-gray-700 max-w-lg mx-auto">
+                  Unfortunately, your hotel profile was rejected by our administration team.
+                </p>
+                <div className="mt-6 p-6 bg-red-50 rounded-xl border border-red-200 max-w-md mx-auto text-left">
+                  <p className="text-sm font-bold text-red-800 uppercase mb-1">Reason for Rejection:</p>
+                  <p className="text-red-700">{hotel.rejectionReason}</p>
+                </div>
+                <div className="mt-8">
+                  <Link to="/provider/onboarding/hotel" className="bg-red-600 text-white px-8 py-3 rounded-md font-bold hover:bg-red-700 transition shadow-md">
+                    Update Profile & Reapply
+                  </Link>
+                </div>
+              </div>
             ) : !hotel.isApproved ? (
               <div className="text-center m-auto py-12">
                 <div className="text-6xl mb-4">⏳</div>
@@ -126,72 +236,367 @@ const ProviderDashboard = () => {
             ) : (
               <div>
                 <div className="flex justify-between items-center mb-8">
-                  <div>
-                    <h2 className="text-3xl font-bold text-gray-800">{hotel.profile?.hotelName}</h2>
-                    <p className="text-gray-500">Manage your rooms and availability.</p>
+                  <div className="flex gap-4 items-center">
+                    {hotel.documents?.propertyPhotos?.length > 0 && (
+                      <img src={hotel.documents.propertyPhotos[0]} alt="Hotel" className="w-16 h-16 rounded-md object-cover border border-gray-200" />
+                    )}
+                    <div>
+                      <h2 className="text-3xl font-bold text-gray-800">{hotel.profile?.hotelName}</h2>
+                      <p className="text-gray-500">Your hotel is approved and active.</p>
+                    </div>
                   </div>
                   <span className="bg-green-100 text-green-800 px-4 py-2 rounded-full font-bold text-sm">Approved</span>
                 </div>
-
-                {/* Add Room Form */}
-                <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Add New Room Type</h3>
-                  <form onSubmit={handleAddRoom} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Room Type</label>
-                      <input type="text" required value={roomForm.roomType} onChange={e => setRoomForm({...roomForm, roomType: e.target.value})} className="w-full p-2 border border-gray-300 rounded focus:ring-accent focus:border-accent" placeholder="e.g. Deluxe Suite" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Occupancy</label>
-                      <input type="number" min="1" required value={roomForm.occupancy} onChange={e => setRoomForm({...roomForm, occupancy: Number(e.target.value)})} className="w-full p-2 border border-gray-300 rounded focus:ring-accent focus:border-accent" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹)</label>
-                      <input type="number" min="0" required value={roomForm.price} onChange={e => setRoomForm({...roomForm, price: Number(e.target.value)})} className="w-full p-2 border border-gray-300 rounded focus:ring-accent focus:border-accent" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Total Rooms</label>
-                      <input type="number" min="1" required value={roomForm.totalRooms} onChange={e => setRoomForm({...roomForm, totalRooms: Number(e.target.value)})} className="w-full p-2 border border-gray-300 rounded focus:ring-accent focus:border-accent" />
-                    </div>
-                    <div className="md:col-span-4 flex justify-end mt-2">
-                      <button type="submit" className="bg-primary text-white px-6 py-2 rounded font-bold hover:bg-primary-light transition">Add Room</button>
-                    </div>
-                  </form>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+                  <h3 className="text-lg font-bold text-blue-800 mb-2">Manage Your Hotel</h3>
+                  <p className="text-blue-700 mb-4">Use the sidebar links to manage your rooms and view incoming bookings.</p>
+                  <div className="flex justify-center gap-4">
+                    <Link to="/provider/hotel/rooms" className="bg-primary text-white px-6 py-2 rounded-lg font-semibold hover:bg-primary-light transition shadow-sm">
+                      Manage Rooms
+                    </Link>
+                    <Link to="/provider/hotel/bookings" className="bg-white text-primary px-6 py-2 rounded-lg font-semibold border border-primary hover:bg-gray-50 transition shadow-sm">
+                      View Bookings
+                    </Link>
+                  </div>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
 
-                {/* Existing Rooms List */}
-                <h3 className="text-xl font-bold text-gray-800 mb-4">Your Rooms</h3>
-                {rooms.length === 0 ? (
-                  <p className="text-gray-500">No rooms added yet.</p>
+        {activeService === 'cab' && (
+          <div className="space-y-12">
+            {/* Hotel Cabs Section */}
+            <div className="border-t border-gray-100 pt-12">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">
+                    {user?.providerType === 'Cab' ? 'Your Cabs' : 'Hotel-Linked Cabs'}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {user?.providerType === 'Cab' ? 'Manage your agency cabs.' : 'Manage cabs specifically linked to your hotel.'}
+                  </p>
+                </div>
+                <Link to="/provider/onboarding/hotel-cab" className="bg-primary text-white px-4 py-2 rounded font-bold hover:bg-primary-light transition text-sm shadow-sm">
+                  {user?.providerType === 'Cab' ? '+ Add Cab' : '+ Add Hotel Cab'}
+                </Link>
+              </div>
+              
+              {hotelCabs.length === 0 ? (
+                <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
+                  <p className="text-gray-500">
+                    {user?.providerType === 'Cab' ? 'No cabs added to your agency yet.' : 'No cabs linked to your hotel yet.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {hotelCabs.map(cab => (
+                    <div key={cab._id} className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm flex flex-col hover:shadow-md transition">
+                      <h4 className="font-bold text-lg text-gray-800">{cab.vendorDetails?.driverName}</h4>
+                      <p className="text-sm text-gray-500 mb-2">{cab.vendorDetails?.mobile}</p>
+                      <div className="mb-4">
+                        <span className={`px-2 py-1 text-xs font-bold rounded-full uppercase ${cab.status === 'approved' ? 'bg-green-100 text-green-800' : cab.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                          {cab.status}
+                        </span>
+                      </div>
+                      <div className="flex justify-between pt-4 border-t border-gray-100 mt-auto">
+                        <button onClick={() => { setSelectedCab(cab); setShowCabDetails(true); }} className="text-sm text-gray-600 font-semibold hover:text-gray-900">View Details</button>
+                        <button type="button" onClick={() => handleDeleteCab(cab._id)} className="text-sm text-red-600 font-semibold hover:text-red-800">Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Cab Requests Section */}
+            <div className="border-t border-gray-100 pt-12 mt-12">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Pending Cab Requests</h3>
+                  <p className="text-sm text-gray-500">Assign drivers to customers requesting cabs from your hotel.</p>
+                </div>
+              </div>
+
+              {hotelCabBookings.filter(b => b.cabBooking?.status === 'requested').length === 0 ? (
+                <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
+                  <p className="text-gray-500">No pending cab requests at the moment.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto bg-white border border-gray-200 rounded-xl shadow-sm">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle Type</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {hotelCabBookings.filter(b => b.cabBooking?.status === 'requested').map(booking => (
+                        <tr key={booking._id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="font-semibold text-gray-800">{booking.userId?.name || 'Customer'}</div>
+                            <div className="text-xs text-gray-500">{booking.bookingId}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-800"><span className="text-green-600 font-bold">●</span> {booking.cabBooking?.pickupLocation?.address || 'Pickup'}</div>
+                            <div className="text-sm text-gray-800"><span className="text-red-600 font-bold">●</span> {booking.cabBooking?.dropLocation?.address || 'Drop'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(booking.cabBooking?.pickupDateTime).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {booking.cabBooking?.vehicleType}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => {
+                                setSelectedCabRequest(booking);
+                                setAssignFormData({ vendorId: '' });
+                                setShowAssignModal(true);
+                              }}
+                              className="bg-primary text-white px-3 py-1.5 rounded hover:bg-primary-light transition text-xs font-bold"
+                            >
+                              Assign Driver
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Assigned/Active Rides Section */}
+              <div className="mt-12">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Assigned & Active Rides</h3>
+                {hotelCabBookings.filter(b => ['assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(b.cabBooking?.status)).length === 0 ? (
+                  <p className="text-gray-500 text-sm">No active rides.</p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {rooms.map(room => (
-                      <div key={room._id} className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {hotelCabBookings.filter(b => ['assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(b.cabBooking?.status)).map(booking => (
+                      <div key={booking._id} className="border border-gray-200 rounded-xl p-4 bg-gray-50 flex flex-col">
                         <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-bold text-lg text-gray-800">{room.roomType}</h4>
-                          <span className="text-primary font-bold">₹{room.price}</span>
+                          <span className="text-xs font-bold text-gray-500">{booking.bookingId}</span>
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-bold capitalize">{booking.cabBooking?.status.replace(/_/g, ' ')}</span>
                         </div>
-                        <div className="text-sm text-gray-500 space-y-1">
-                          <p>Max Occupancy: {room.occupancy} Guests</p>
-                          <p>Total Inventory: {room.totalRooms} Rooms</p>
+                        <p className="text-sm font-bold text-gray-800 truncate">{booking.cabBooking?.pickupLocation?.address || 'Pickup'}</p>
+                        <p className="text-sm text-gray-600 truncate mb-2">to {booking.cabBooking?.dropLocation?.address || 'Drop'}</p>
+                        <div className="mt-auto pt-2 border-t border-gray-200">
+                          <p className="text-xs text-gray-500">Assigned Driver:</p>
+                          <p className="text-sm font-semibold text-gray-800">{booking.cabBooking?.vendorId?.vendorDetails?.driverName || 'Unknown'}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        )}
-
-        {activeService === 'cab' && isCabActive && (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Cab Management Dashboard</h2>
-            <p className="text-gray-500">Welcome to your active cab management console.</p>
-            {/* Real charts/tables would go here */}
+            </div>
           </div>
         )}
       </div>
+
+      {/* Cab Details Modal */}
+      {showCabDetails && selectedCab && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+              <h2 className="text-xl font-bold text-gray-800">{isEditingCab ? 'Edit Cab' : 'Cab Details'}</h2>
+              <button onClick={() => { setShowCabDetails(false); setIsEditingCab(false); }} className="text-gray-500 hover:text-gray-800">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {isEditingCab ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Driver Name</label>
+                    <input type="text" className="w-full border border-gray-300 rounded p-2 focus:ring-primary focus:border-primary" value={editCabForm.vendorDetails?.driverName || ''} onChange={e => setEditCabForm({...editCabForm, vendorDetails: {...editCabForm.vendorDetails, driverName: e.target.value}})} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+                      <input type="text" className="w-full border border-gray-300 rounded p-2 focus:ring-primary focus:border-primary" value={editCabForm.vendorDetails?.mobile || ''} onChange={e => setEditCabForm({...editCabForm, vendorDetails: {...editCabForm.vendorDetails, mobile: e.target.value}})} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <input type="email" className="w-full border border-gray-300 rounded p-2 focus:ring-primary focus:border-primary" value={editCabForm.vendorDetails?.email || ''} onChange={e => setEditCabForm({...editCabForm, vendorDetails: {...editCabForm.vendorDetails, email: e.target.value}})} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                    <textarea className="w-full border border-gray-300 rounded p-2 focus:ring-primary focus:border-primary" rows="2" value={editCabForm.vendorDetails?.address || ''} onChange={e => setEditCabForm({...editCabForm, vendorDetails: {...editCabForm.vendorDetails, address: e.target.value}})}></textarea>
+                  </div>
+                  <hr className="my-4" />
+                  <h3 className="font-bold text-gray-800">Vehicle Details</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Type</label>
+                      <select className="w-full border border-gray-300 rounded p-2 focus:ring-primary focus:border-primary" value={editCabForm.vehicleDetails?.vehicleType || 'Sedan'} onChange={e => setEditCabForm({...editCabForm, vehicleDetails: {...editCabForm.vehicleDetails, vehicleType: e.target.value}})}>
+                        <option value="Mini">Mini</option>
+                        <option value="Sedan">Sedan</option>
+                        <option value="SUV">SUV</option>
+                        <option value="Luxury">Luxury</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                      <input type="text" className="w-full border border-gray-300 rounded p-2 focus:ring-primary focus:border-primary" value={editCabForm.vehicleDetails?.model || ''} onChange={e => setEditCabForm({...editCabForm, vehicleDetails: {...editCabForm.vehicleDetails, model: e.target.value}})} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Registration Number</label>
+                    <input type="text" className="w-full border border-gray-300 rounded p-2 focus:ring-primary focus:border-primary" value={editCabForm.vehicleDetails?.registrationNumber || ''} onChange={e => setEditCabForm({...editCabForm, vehicleDetails: {...editCabForm.vehicleDetails, registrationNumber: e.target.value}})} />
+                  </div>
+                  <hr className="my-4" />
+                  <h3 className="font-bold text-gray-800">Fare Pricing</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Base Fare (₹)</label>
+                      <input type="number" className="w-full border border-gray-300 rounded p-2 focus:ring-primary focus:border-primary" value={editCabForm.fareSetup?.baseFare || 0} onChange={e => setEditCabForm({...editCabForm, fareSetup: {...editCabForm.fareSetup, baseFare: e.target.value}})} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Per Km Rate (₹)</label>
+                      <input type="number" className="w-full border border-gray-300 rounded p-2 focus:ring-primary focus:border-primary" value={editCabForm.fareSetup?.perKmRate || 0} onChange={e => setEditCabForm({...editCabForm, fareSetup: {...editCabForm.fareSetup, perKmRate: e.target.value}})} />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                  <div><span className="font-semibold text-gray-500">Driver Name:</span> <br/>{selectedCab.vendorDetails?.driverName}</div>
+                  <div><span className="font-semibold text-gray-500">Mobile:</span> <br/>{selectedCab.vendorDetails?.mobile}</div>
+                  <div><span className="font-semibold text-gray-500">Email:</span> <br/>{selectedCab.vendorDetails?.email || 'N/A'}</div>
+                  <div><span className="font-semibold text-gray-500">Address:</span> <br/>{selectedCab.vendorDetails?.address}</div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                  {selectedCab.vendorDetails?.driverPhoto && (
+                     <div>
+                       <p className="font-semibold text-gray-500 text-sm mb-2">Driver Photo:</p>
+                       <img src={selectedCab.vendorDetails.driverPhoto} alt="Driver" className="w-full h-32 object-cover rounded border" />
+                     </div>
+                  )}
+                  {selectedCab.documents?.drivingLicense && (
+                     <div>
+                       <p className="font-semibold text-gray-500 text-sm mb-2">Driving License:</p>
+                       <img src={selectedCab.documents.drivingLicense} alt="License" className="w-full h-32 object-cover rounded border" />
+                     </div>
+                  )}
+                </div>
+                
+                {selectedCab.driverCredentials && selectedCab.driverCredentials.loginId && (
+                  <div className="bg-green-50 border border-green-200 p-4 rounded-xl mt-4">
+                    <h3 className="text-green-800 font-bold mb-2">Driver Login Credentials Generated</h3>
+                    <p className="text-sm text-green-700 mb-1"><span className="font-semibold">Login ID (Mobile):</span> {selectedCab.driverCredentials.loginId}</p>
+                    <p className="text-sm text-green-700 mb-1"><span className="font-semibold">Password:</span> {selectedCab.driverCredentials.password}</p>
+                    <p className="text-xs text-green-600 mt-2">Please share these credentials with the driver so they can log in.</p>
+                  </div>
+                )}
+              </>
+              )}
+            </div>
+
+            <div className="p-6 border-t bg-gray-50 flex justify-end gap-4">
+              {isEditingCab ? (
+                <>
+                  <button type="button" onClick={() => setIsEditingCab(false)} className="bg-gray-200 text-gray-800 px-6 py-2 rounded font-bold hover:bg-gray-300 transition">
+                    Cancel
+                  </button>
+                  <button type="button" onClick={handleUpdateCab} disabled={editCabUploading} className={`bg-primary text-white px-8 py-2 rounded font-bold hover:bg-primary-light transition shadow-md ${editCabUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    {editCabUploading ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" onClick={() => handleDeleteCab(selectedCab._id)} className="bg-red-100 text-red-700 px-6 py-2 rounded font-bold hover:bg-red-200 transition">
+                    Delete Cab
+                  </button>
+                  <button type="button" onClick={() => { 
+                    const vehicle = vehicles.find(v => v.vendorId === selectedCab._id);
+                    const fareRule = vehicle ? fareRules.find(f => f.vehicleType === vehicle.details?.vehicleType) : null;
+                    setEditCabForm({ 
+                      vendorDetails: { ...selectedCab.vendorDetails },
+                      vehicleDetails: vehicle ? { ...vehicle.details } : {},
+                      fareSetup: fareRule ? { baseFare: fareRule.baseFare, perKmRate: fareRule.perKmRate } : { baseFare: 0, perKmRate: 0 }
+                    }); 
+                    setIsEditingCab(true); 
+                  }} className="bg-yellow-100 text-yellow-700 px-6 py-2 rounded font-bold hover:bg-yellow-200 transition">
+                    Edit Cab
+                  </button>
+                  <button type="button" onClick={() => { setShowCabDetails(false); setIsEditingCab(false); }} className="bg-gray-200 text-gray-800 px-8 py-2 rounded font-bold hover:bg-gray-300 transition shadow-md">
+                    Close
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Driver Modal */}
+      {showAssignModal && selectedCabRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+              <h2 className="text-xl font-bold text-gray-800">Assign Driver</h2>
+              <button onClick={() => setShowAssignModal(false)} className="text-gray-500 hover:text-gray-800">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            
+            <form onSubmit={handleAssignDriver} className="p-6">
+              <div className="mb-4">
+                <p className="text-sm text-gray-500 mb-1">Customer</p>
+                <p className="font-semibold">{selectedCabRequest.userId?.name}</p>
+              </div>
+              <div className="mb-6">
+                <p className="text-sm text-gray-500 mb-1">Requested Vehicle Type</p>
+                <p className="font-semibold">{selectedCabRequest.cabBooking?.vehicleType}</p>
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Driver</label>
+                <select 
+                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-primary focus:border-primary"
+                  value={assignFormData.vendorId}
+                  onChange={(e) => setAssignFormData({ vendorId: e.target.value })}
+                  required
+                >
+                  <option value="">-- Choose an available driver --</option>
+                  {hotelCabs
+                    .filter(cab => cab.status === 'approved' && cab.availability?.isAvailable !== false)
+                    .map(cab => {
+                      const veh = vehicles.find(v => v.vendorId === cab._id);
+                      return (
+                        <option key={cab._id} value={cab._id}>
+                          {cab.vendorDetails?.driverName} {veh ? `(${veh.details?.vehicleType} - ${veh.details?.registrationNumber})` : ''}
+                        </option>
+                      );
+                  })}
+                </select>
+                {hotelCabs.filter(c => c.status === 'approved' && c.availability?.isAvailable !== false).length === 0 && (
+                  <p className="text-red-500 text-xs mt-2">No available approved drivers found. Add more cabs or wait for drivers to finish trips.</p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 mt-8">
+                <button type="button" onClick={() => setShowAssignModal(false)} className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg font-bold hover:bg-gray-300 transition">
+                  Cancel
+                </button>
+                <button type="submit" disabled={assigningLoading || !assignFormData.vendorId} className={`bg-primary text-white px-8 py-2 rounded-lg font-bold hover:bg-primary-light transition shadow-md ${(assigningLoading || !assignFormData.vendorId) ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {assigningLoading ? 'Assigning...' : 'Confirm Assignment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

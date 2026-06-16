@@ -1,14 +1,30 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-toastify';
 
 const SelectService = () => {
   const navigate = useNavigate();
+  const { updateUser } = useAuth();
+  const [loading, setLoading] = useState(false);
 
-  const handleSelect = (service) => {
-    if (service === 'hotel') {
-      navigate('/provider/onboarding/hotel');
-    } else {
-      navigate('/provider/onboarding/cab');
+  const handleSelect = async (service) => {
+    setLoading(true);
+    try {
+      const type = service === 'hotel' ? 'Hotel' : 'Cab';
+      await api.patch('/providers/type', { providerType: type });
+      updateUser({ providerType: type });
+      
+      if (service === 'hotel') {
+        navigate('/provider/onboarding/hotel');
+      } else {
+        navigate('/provider/onboarding/cab');
+      }
+    } catch (err) {
+      toast.error('Failed to select service. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -42,7 +42,9 @@ const hotelSchema = new mongoose.Schema({
       payoutPreference: String
     }
   },
-  isApproved: { type: Boolean, default: false }
+  isApproved: { type: Boolean, default: false }, // Keeping this for backward compatibility
+  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  rejectionReason: { type: String }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Hotel', hotelSchema);

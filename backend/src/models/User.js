@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema({
   mobile: { type: String, required: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['Customer', 'Provider', 'Admin'], default: 'Customer' },
+  providerType: { type: String, enum: ['Hotel', 'Cab', 'Driver'] }, // 'Hotel' providers can do both, 'Cab' can only do cabs, 'Driver' is a cab driver
   permissions: [{ type: String }], // e.g., 'manage_users', 'manage_hotels'
   status: { type: String, enum: ['active', 'blocked'], default: 'active' },
   location: { type: String }

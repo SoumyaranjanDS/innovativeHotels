@@ -22,7 +22,11 @@ const Login = () => {
       if (user.role === 'Admin') {
         navigate('/admin/dashboard');
       } else if (user.role === 'Provider') {
-        navigate('/provider/dashboard');
+        if (user.providerType === 'Driver') {
+          navigate('/provider/driver-dashboard');
+        } else {
+          navigate('/provider/dashboard');
+        }
       } else {
         navigate('/');
       }
@@ -46,15 +50,15 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email or Mobile</label>
             <input
-              type="email"
+              type="text"
               name="email"
               required
               value={formData.email}
               onChange={handleChange}
               className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition"
-              placeholder="john@example.com"
+              placeholder="john@example.com or 9876543210"
             />
           </div>
 

@@ -3,85 +3,290 @@ const HotelAvailability = require('../models/HotelAvailability');
 const BookingHold = require('../models/BookingHold');
 const Booking = require('../models/Booking');
 const Room = require('../models/Room');
+const Review = require('../models/Review');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
+// Helper: get stay dates (excludes checkout date)
+const getStayDates = (checkIn, checkOut) => {
+  const dates = [];
+  let current = new Date(checkIn);
+  current.setHours(0, 0, 0, 0);
+  const end = new Date(checkOut);
+  end.setHours(0, 0, 0, 0);
+  while (current < end) {
+    dates.push(new Date(current));
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+};
+
+// @desc    Search hotels (public)
+// @route   GET /api/hotels/search
 exports.searchHotels = async (req, res) => {
   try {
-    const { city, checkIn, checkOut, guests } = req.query;
-    
-    // For MVP, if no specific query, just return all available hotels with their rooms
-    // We'll populate rooms to easily grab hotelId and roomId in the frontend
-    const hotels = await Hotel.find({ isApproved: true })
-      .select('profile.hotelName partnerDetails.city profile.starRating profile.description profile.photos');
-    
-    // Get rooms for these hotels
+    const { city, checkIn, checkOut, guests, rooms } = req.query;
+
+    const filter = { isApproved: true, status: 'approved' };
+    if (city) {
+      filter['partnerDetails.city'] = { $regex: city, $options: 'i' };
+    }
+
+    const hotels = await Hotel.find(filter)
+      .select('profile partnerDetails documents');
+
     const hotelsWithRooms = await Promise.all(hotels.map(async (h) => {
-      const rooms = await Room.find({ hotelId: h._id });
+      const hotelRooms = await Room.find({ hotelId: h._id });
       const obj = h.toObject();
-      return { 
-        ...obj, 
-        hotelName: obj.profile?.hotelName || 'Unknown Hotel', 
+
+      // Get reviews for avg rating
+      const reviews = await Review.find({ hotelId: h._id, status: 'approved' });
+      const avgRating = reviews.length > 0
+        ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+        : null;
+
+      // Check availability if dates provided
+      let availableRooms = hotelRooms;
+      if (checkIn && checkOut) {
+        const stayDates = getStayDates(checkIn, checkOut);
+        const roomsNeeded = parseInt(rooms) || 1;
+
+        availableRooms = [];
+        for (const room of hotelRooms) {
+          let isAvailable = true;
+          for (const date of stayDates) {
+            const avail = await HotelAvailability.findOne({
+              hotelId: h._id, roomId: room._id, date
+            });
+            if (!avail || avail.isBlocked ||
+              (avail.totalRooms - avail.bookedRooms - avail.heldRooms) < roomsNeeded) {
+              isAvailable = false;
+              break;
+            }
+          }
+          if (isAvailable) availableRooms.push(room);
+        }
+      }
+
+      // Filter by guest capacity
+      if (guests) {
+        const guestCount = parseInt(guests);
+        availableRooms = availableRooms.filter(r => r.occupancy >= guestCount);
+      }
+
+      const startingPrice = availableRooms.length > 0
+        ? Math.min(...availableRooms.map(r => r.price))
+        : null;
+
+      return {
+        _id: obj._id,
+        hotelName: obj.profile?.hotelName || 'Unknown Hotel',
         city: obj.partnerDetails?.city || 'Unknown City',
-        rooms 
+        state: obj.partnerDetails?.state || '',
+        address: obj.partnerDetails?.address || '',
+        category: obj.profile?.category || '',
+        starRating: obj.profile?.starRating || 0,
+        description: obj.profile?.description || '',
+        amenities: obj.profile?.amenities || [],
+        checkInTime: obj.profile?.checkInTime || '14:00',
+        checkOutTime: obj.profile?.checkOutTime || '11:00',
+        cancellationPolicy: obj.policies?.cancellation || 'Standard cancellation policy',
+        photos: obj.documents?.propertyPhotos || [],
+        rooms: availableRooms,
+        startingPrice,
+        avgRating,
+        reviewCount: reviews.length,
       };
     }));
 
-    res.json({ success: true, data: hotelsWithRooms });
+    // Filter out hotels with no available rooms when dates are provided
+    const filtered = (checkIn && checkOut)
+      ? hotelsWithRooms.filter(h => h.rooms.length > 0)
+      : hotelsWithRooms;
+
+    res.json({ success: true, count: filtered.length, data: filtered });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
+// @desc    Get hotel detail (public)
+// @route   GET /api/hotels/:id
+exports.getHotelDetail = async (req, res) => {
+  try {
+    const hotel = await Hotel.findOne({ _id: req.params.id, isApproved: true, status: 'approved' });
+    if (!hotel) return res.status(404).json({ success: false, message: 'Hotel not found' });
+
+    const rooms = await Room.find({ hotelId: hotel._id });
+    const reviews = await Review.find({ hotelId: hotel._id, status: 'approved' })
+      .populate('userId', 'name')
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    const avgRating = reviews.length > 0
+      ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+      : null;
+
+    const { checkIn, checkOut, rooms: roomsNeeded } = req.query;
+    let roomsWithAvailability = rooms.map(r => ({ ...r.toObject(), available: true, availableCount: r.totalRooms }));
+
+    if (checkIn && checkOut) {
+      const stayDates = getStayDates(checkIn, checkOut);
+      const needed = parseInt(roomsNeeded) || 1;
+
+      roomsWithAvailability = await Promise.all(rooms.map(async (room) => {
+        let minAvailable = room.totalRooms;
+        let available = true;
+        let pricePerNight = room.price;
+
+        for (const date of stayDates) {
+          const avail = await HotelAvailability.findOne({
+            hotelId: hotel._id, roomId: room._id, date
+          });
+          if (!avail || avail.isBlocked) {
+            available = false;
+            minAvailable = 0;
+            break;
+          }
+          const free = avail.totalRooms - avail.bookedRooms - avail.heldRooms;
+          if (free < needed) available = false;
+          minAvailable = Math.min(minAvailable, free);
+          pricePerNight = avail.finalPrice || room.price;
+        }
+
+        return {
+          ...room.toObject(),
+          available,
+          availableCount: Math.max(0, minAvailable),
+          pricePerNight,
+          nights: stayDates.length,
+        };
+      }));
+    }
+
+    const obj = hotel.toObject();
+    res.json({
+      success: true,
+      data: {
+        _id: obj._id,
+        hotelName: obj.profile?.hotelName || 'Unknown Hotel',
+        city: obj.partnerDetails?.city || '',
+        state: obj.partnerDetails?.state || '',
+        address: obj.partnerDetails?.address || '',
+        category: obj.profile?.category || '',
+        starRating: obj.profile?.starRating || 0,
+        description: obj.profile?.description || '',
+        amenities: obj.profile?.amenities || [],
+        nearbyPlaces: obj.profile?.nearbyPlaces || [],
+        checkInTime: obj.profile?.checkInTime || '14:00',
+        checkOutTime: obj.profile?.checkOutTime || '11:00',
+        policies: obj.policies || {},
+        photos: obj.documents?.propertyPhotos || [],
+        rooms: roomsWithAvailability,
+        avgRating,
+        reviewCount: reviews.length,
+        reviews,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Check room availability
+// @route   POST /api/hotels/:id/check-availability
+exports.checkAvailability = async (req, res) => {
+  try {
+    const { roomId, checkIn, checkOut, roomsCount } = req.body;
+    const hotelId = req.params.id;
+    const needed = parseInt(roomsCount) || 1;
+    const stayDates = getStayDates(checkIn, checkOut);
+
+    if (stayDates.length === 0) {
+      return res.status(400).json({ success: false, message: 'Invalid date range' });
+    }
+
+    let totalPrice = 0;
+    let available = true;
+
+    for (const date of stayDates) {
+      const avail = await HotelAvailability.findOne({ hotelId, roomId, date });
+      if (!avail || avail.isBlocked) {
+        available = false;
+        break;
+      }
+      const free = avail.totalRooms - avail.bookedRooms - avail.heldRooms;
+      if (free < needed) {
+        available = false;
+        break;
+      }
+      totalPrice += avail.finalPrice * needed;
+    }
+
+    const room = await Room.findById(roomId);
+    const taxAmount = Math.round(totalPrice * (room?.taxPercent || 18) / 100);
+    const discountAmount = Math.round(totalPrice * (room?.discountPercent || 0) / 100);
+
+    res.json({
+      success: true,
+      available,
+      nights: stayDates.length,
+      roomsCount: needed,
+      basePrice: totalPrice,
+      taxAmount,
+      discountAmount,
+      totalPrice: totalPrice + taxAmount - discountAmount,
+      pricePerNight: stayDates.length > 0 ? Math.round(totalPrice / stayDates.length / needed) : 0,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Hold room for booking
+// @route   POST /api/hotels/hold
 exports.holdRoom = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
     const { hotelId, roomId, checkInDate, checkOutDate, roomsCount, guests } = req.body;
-    
-    // Calculate dates array (excluding checkout date as per rule)
-    const dates = [];
-    let currentDate = new Date(checkInDate);
-    const end = new Date(checkOutDate);
-    while (currentDate < end) {
-      dates.push(new Date(currentDate));
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
+    const needed = parseInt(roomsCount) || 1;
+
+    // Validate room belongs to hotel
+    const room = await Room.findOne({ _id: roomId, hotelId });
+    if (!room) throw new Error('Room not found for this hotel');
+
+    const dates = getStayDates(checkInDate, checkOutDate);
+    if (dates.length === 0) throw new Error('Invalid date range');
 
     let totalBasePrice = 0;
 
     for (const date of dates) {
-      // Find availability for this date
       const availability = await HotelAvailability.findOne({ hotelId, roomId, date }).session(session);
-      
-      if (!availability) {
-        throw new Error(`Availability not configured for ${date.toISOString()}`);
-      }
 
-      if (availability.isBlocked) {
-        throw new Error(`Room blocked for ${date.toISOString()}`);
-      }
+      if (!availability) throw new Error(`Availability not configured for ${date.toLocaleDateString()}`);
+      if (availability.isBlocked) throw new Error(`Room blocked for ${date.toLocaleDateString()}`);
 
-      // Atomic check: totalRooms - bookedRooms - heldRooms >= roomsCount
       const availableCount = availability.totalRooms - availability.bookedRooms - availability.heldRooms;
-      if (availableCount < roomsCount) {
-         throw new Error('Sorry, this room is no longer available for the selected dates.');
+      if (availableCount < needed) {
+        throw new Error('Sorry, this room is no longer available for the selected dates. Please choose another room.');
       }
 
-      // Update heldRooms atomically
       await HotelAvailability.updateOne(
-        { _id: availability._id, $expr: { $gte: [{ $subtract: ["$totalRooms", { $add: ["$bookedRooms", "$heldRooms"] }] }, roomsCount] } },
-        { $inc: { heldRooms: roomsCount } },
+        { _id: availability._id, $expr: { $gte: [{ $subtract: ["$totalRooms", { $add: ["$bookedRooms", "$heldRooms"] }] }, needed] } },
+        { $inc: { heldRooms: needed } },
         { session }
       );
-      
-      totalBasePrice += availability.finalPrice * roomsCount;
+
+      totalBasePrice += availability.finalPrice * needed;
     }
 
-    // Create the hold record
     const holdCode = uuidv4();
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 10); // 10 minutes hold
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+    const taxAmount = Math.round(totalBasePrice * (room.taxPercent || 18) / 100);
+    const discountAmount = Math.round(totalBasePrice * (room.discountPercent || 0) / 100);
 
     const newHold = await BookingHold.create([{
       holdCode,
@@ -91,13 +296,13 @@ exports.holdRoom = async (req, res) => {
       checkInDate,
       checkOutDate,
       dates,
-      roomsCount,
-      guests,
+      roomsCount: needed,
+      guests: guests || { adults: 1, children: 0 },
       priceSnapshot: {
         basePrice: totalBasePrice,
-        taxAmount: totalBasePrice * 0.18, // example tax
-        discountAmount: 0,
-        totalPrice: totalBasePrice * 1.18
+        taxAmount,
+        discountAmount,
+        totalPrice: totalBasePrice + taxAmount - discountAmount
       },
       expiresAt
     }], { session });
@@ -105,8 +310,24 @@ exports.holdRoom = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    res.status(200).json({ success: true, message: 'Room held successfully', hold: newHold[0] });
+    // Fetch hotel & room info for the response
+    const hotel = await Hotel.findById(hotelId);
 
+    res.status(200).json({
+      success: true,
+      message: 'Room held successfully',
+      hold: {
+        ...newHold[0].toObject(),
+        hotelName: hotel?.profile?.hotelName || 'Hotel',
+        hotelAddress: hotel?.partnerDetails?.address || '',
+        hotelCity: hotel?.partnerDetails?.city || '',
+        roomType: room.roomType,
+        roomAmenities: room.amenities,
+        checkInTime: hotel?.profile?.checkInTime || '14:00',
+        checkOutTime: hotel?.profile?.checkOutTime || '11:00',
+        cancellationPolicy: hotel?.policies?.cancellation || 'Standard cancellation policy',
+      }
+    });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -114,61 +335,97 @@ exports.holdRoom = async (req, res) => {
   }
 };
 
+// @desc    Confirm booking from hold
+// @route   POST /api/hotels/confirm
 exports.confirmBooking = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { holdId, guestDetails, paymentMethod } = req.body;
-    
-    // Find the hold
+    const { holdId, guestDetails, paymentMode, needPickupCab, couponCode } = req.body;
+
     const hold = await BookingHold.findById(holdId).session(session);
-    if (!hold) {
-      throw new Error('Hold record not found');
+    if (!hold) throw new Error('Hold record not found');
+    if (hold.status !== 'active') throw new Error('This hold is no longer active.');
+    if (new Date() > hold.expiresAt) throw new Error('Your room hold has expired. Please select the room again.');
+
+    // Determine payment status based on mode
+    let paymentStatus = 'pending';
+    let hotelStatus = 'payment_pending';
+
+    if (paymentMode === 'online') {
+      // Mock payment simulation - always succeeds
+      paymentStatus = 'paid';
+      hotelStatus = 'pending_approval';
+    } else if (paymentMode === 'pay_at_hotel') {
+      paymentStatus = 'pending';
+      hotelStatus = 'pending_approval';
     }
 
-    // Check if expired
-    if (new Date() > hold.expiresAt) {
-      throw new Error('This booking hold has expired. Please search again.');
-    }
+    const bookingId = `HTL-${uuidv4().substring(0, 8).toUpperCase()}`;
 
-    // Create the final booking
-    const bookingCode = `BKG-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    
     const booking = await Booking.create([{
-      bookingCode,
+      bookingId,
       userId: hold.userId,
-      providerId: hold.hotelId, // Dummy map for MVP
-      serviceType: 'Hotel',
-      serviceId: hold.roomId,
-      dates: { checkIn: hold.checkInDate, checkOut: hold.checkOutDate },
-      payment: {
-        totalAmount: hold.priceSnapshot.totalPrice,
-        status: 'completed', // Assuming successful mock payment
-        method: paymentMethod || 'credit_card'
+      bookingType: 'HOTEL',
+      hotelBooking: {
+        hotelId: hold.hotelId,
+        roomId: hold.roomId,
+        holdId: hold._id,
+        checkInDate: hold.checkInDate,
+        checkOutDate: hold.checkOutDate,
+        dates: hold.dates,
+        roomsCount: hold.roomsCount,
+        guests: hold.guests,
+        guestDetails: guestDetails || {},
+        needPickupCab: needPickupCab || 'no',
+        status: hotelStatus,
       },
-      status: 'confirmed',
-      guestDetails: guestDetails || hold.guests
+      paymentMode: paymentMode || 'online',
+      paymentStatus,
+      totalAmount: hold.priceSnapshot.totalPrice,
+      taxAmount: hold.priceSnapshot.taxAmount,
+      discountAmount: hold.priceSnapshot.discountAmount,
+      couponCode: couponCode || null,
+      couponDiscount: 0,
+      platformCommission: Math.round(hold.priceSnapshot.totalPrice * 0.1),
+      partnerEarning: Math.round(hold.priceSnapshot.totalPrice * 0.9),
     }], { session });
 
-    // Update availability (deduct from heldRooms, add to bookedRooms)
+    // Update availability: deduct from heldRooms, add to bookedRooms
     for (const date of hold.dates) {
       await HotelAvailability.updateOne(
-        { hotelId: hold.hotelId, roomId: hold.roomId, date: date },
-        { 
-          $inc: { heldRooms: -hold.roomsCount, bookedRooms: hold.roomsCount }
-        },
+        { hotelId: hold.hotelId, roomId: hold.roomId, date },
+        { $inc: { heldRooms: -hold.roomsCount, bookedRooms: hold.roomsCount } },
         { session }
       );
     }
 
-    // Remove the hold record
-    await BookingHold.findByIdAndDelete(holdId).session(session);
+    // Mark hold as converted
+    hold.status = 'converted';
+    await hold.save({ session });
 
     await session.commitTransaction();
     session.endSession();
 
-    res.status(200).json({ success: true, message: 'Booking confirmed successfully!', booking: booking[0] });
+    // Fetch enriched data for response
+    const hotel = await Hotel.findById(hold.hotelId);
+    const room = await Room.findById(hold.roomId);
 
+    res.status(200).json({
+      success: true,
+      message: 'Booking confirmed successfully!',
+      booking: {
+        ...booking[0].toObject(),
+        hotelName: hotel?.profile?.hotelName || '',
+        hotelAddress: hotel?.partnerDetails?.address || '',
+        hotelCity: hotel?.partnerDetails?.city || '',
+        hotelPhone: hotel?.partnerDetails?.mobile || '',
+        roomType: room?.roomType || '',
+        checkInTime: hotel?.profile?.checkInTime || '14:00',
+        checkOutTime: hotel?.profile?.checkOutTime || '11:00',
+        cancellationPolicy: hotel?.policies?.cancellation || 'Standard cancellation policy',
+      }
+    });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();

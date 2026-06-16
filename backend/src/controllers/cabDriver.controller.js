@@ -3,6 +3,60 @@ const CabVendor = require('../models/CabVendor');
 const RideNotification = require('../models/RideNotification');
 const PlatformFee = require('../models/PlatformFee');
 
+exports.updateLocation = async (req, res) => {
+  try {
+    const { lat, lng } = req.body;
+    const vendor = await CabVendor.findOneAndUpdate(
+      { $or: [{ providerId: req.user.id }, { driverId: req.user.id }] },
+      { 
+        currentLocation: { type: 'Point', coordinates: [lng, lat] },
+        lastLocationUpdatedAt: new Date()
+      },
+      { new: true }
+    );
+    res.json({ success: true, currentLocation: vendor.currentLocation });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getRideRequests = async (req, res) => {
+  try {
+    const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
+    if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+
+    const notifications = await RideNotification.find({
+      cabProviderId: vendor._id,
+      status: 'sent'
+    }).populate({
+      path: 'bookingId',
+      match: { 'cabBooking.status': { $in: ['requested', 'hotel_cabs_notified', 'external_cabs_notified'] } }
+    });
+
+    // Filter out notifications where booking is no longer pending
+    const validRequests = notifications.filter(n => n.bookingId !== null).map(n => n.bookingId);
+    res.json({ success: true, requests: validRequests });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getActiveRide = async (req, res) => {
+  try {
+    const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
+    if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+
+    const activeRide = await Booking.findOne({
+      'cabBooking.assignedCabProviderId': vendor._id,
+      'cabBooking.status': { $in: ['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'] }
+    });
+
+    res.json({ success: true, activeRide });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // Accept Ride Request Atomically
 exports.acceptRide = async (req, res) => {
   try {
@@ -10,7 +64,7 @@ exports.acceptRide = async (req, res) => {
     const providerId = req.user.id;
 
     // 1. Verify Driver Eligibility
-    const vendor = await CabVendor.findOne({ providerId, isApproved: true });
+    const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }], isApproved: true });
     if (!vendor) return res.status(403).json({ success: false, message: 'Driver not approved or found' });
     
     if (!vendor.availability.isAvailable) {
@@ -27,6 +81,7 @@ exports.acceptRide = async (req, res) => {
         $set: {
           'cabBooking.status': 'accepted',
           'cabBooking.vendorId': vendor._id,
+          'cabBooking.assignedCabProviderId': vendor._id,
           'cabBooking.acceptedAt': new Date()
         }
       },
@@ -71,7 +126,7 @@ exports.updateRideStatus = async (req, res) => {
     const { status, lat, lng } = req.body;
     const providerId = req.user.id;
 
-    const vendor = await CabVendor.findOne({ providerId });
+    const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
     const booking = await Booking.findOne({ _id: bookingId, 'cabBooking.vendorId': vendor._id });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -95,14 +150,19 @@ exports.updateRideStatus = async (req, res) => {
       vendor.availability.isAvailable = true;
       await vendor.save();
 
-      // Generate Platform Fee (Assume 10% commission)
-      const commissionAmount = (booking.totalAmount * 10) / 100;
+      // Generate Platform Fee from fareSnapshot
+      const platformFeeAmount = booking.cabBooking.fareSnapshot?.platformFee || ((booking.totalAmount * 10) / 100);
+      const driverEarningAmount = booking.cabBooking.fareSnapshot?.providerEarning || (booking.totalAmount - platformFeeAmount);
+      
       await PlatformFee.create({
         bookingId: booking._id,
         providerId: vendor.providerId,
+        cabProviderId: vendor._id,
+        driverId: vendor.driverId,
+        hotelId: vendor.hotelId,
         grossFare: booking.totalAmount,
-        platformFee: commissionAmount,
-        driverEarning: booking.totalAmount - commissionAmount,
+        platformFee: platformFeeAmount,
+        driverEarning: driverEarningAmount,
         feeStatus: 'payable'
       });
     }
@@ -121,6 +181,27 @@ exports.updateRideStatus = async (req, res) => {
     res.json({ success: true, booking });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getDriverProfile = async (req, res) => {
+  try {
+    const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
+    if (!vendor) return res.status(404).json({ success: false, message: 'Driver profile not found' });
+
+    const Vehicle = require('../models/Vehicle');
+    const vehicle = await Vehicle.findOne({ vendorId: vendor._id });
+
+    res.json({
+      success: true,
+      data: {
+        vendor,
+        vehicle
+      }
+    });
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };

@@ -7,13 +7,13 @@ const generateToken = (id) => {
 
 exports.register = async (req, res) => {
   try {
-    let { name, email, mobile, password, role, location } = req.body;
+    let { name, email, mobile, password, role, providerType, location } = req.body;
     email = email?.trim().toLowerCase();
     
     const userExists = await User.findOne({ email });
     if (userExists) return res.status(400).json({ success: false, message: 'User already exists' });
 
-    const user = await User.create({ name, email, mobile, password, role, location });
+    const user = await User.create({ name, email, mobile, password, role, providerType, location });
     
     // Auto-create ProviderProfile if role is Provider
     if (role === 'Provider') {
@@ -24,7 +24,7 @@ exports.register = async (req, res) => {
     res.status(201).json({
       success: true,
       token: generateToken(user._id),
-      user: { id: user._id, name, email, role }
+      user: { id: user._id, name, email, role, providerType }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -34,9 +34,12 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     let { email, password } = req.body;
-    email = email?.trim().toLowerCase();
+    const loginId = email?.trim().toLowerCase();
     
-    const user = await User.findOne({ email });
+    // Find by email or mobile
+    const user = await User.findOne({ 
+      $or: [{ email: loginId }, { mobile: loginId }] 
+    });
     if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
     if (user.status === 'blocked') {
@@ -49,7 +52,7 @@ exports.login = async (req, res) => {
     res.status(200).json({
       success: true,
       token: generateToken(user._id),
-      user: { id: user._id, name: user.name, email, role: user.role }
+      user: { id: user._id, name: user.name, email, role: user.role, providerType: user.providerType }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

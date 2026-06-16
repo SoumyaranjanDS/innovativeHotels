@@ -22,25 +22,32 @@ const CabLiveTracking = () => {
 
   useEffect(() => {
     // 1. Fetch booking details
-    // For MVP we mock the exact API endpoint if it's not created yet, or use the existing
     const fetchBooking = async () => {
-      // NOTE: Assume we have an endpoint GET /api/cabs/bookings/:id
-      // For now, we wait for sockets
+      try {
+        const res = await api.get(`/bookings/${bookingId}`);
+        setBooking(res.data.data);
+        if (res.data.data.cabBooking) {
+            setStatus(res.data.data.cabBooking.status);
+            // If already on the way, we might need driver location. Let's assume we fetch it via socket later.
+        }
+      } catch (err) {
+        toast.error("Failed to load booking details");
+      }
     };
     fetchBooking();
 
     // 2. Setup Sockets
     const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000');
     
-    // Assume user ID is 123 for now since we don't have auth context imported here directly,
-    // In real app, get from AuthContext
     const userId = JSON.parse(localStorage.getItem('user'))?.id;
-    if (userId) socket.emit('join_room', { role: 'user', id: userId });
+    if (userId) {
+      socket.emit('join_room', { role: 'user', id: userId });
+    }
 
     socket.on('ride_accepted', (data) => {
       if (data.bookingId === bookingId) {
         setStatus('accepted');
-        toast.success(`Driver ${data.driverInfo.driverName} has accepted your ride!`);
+        toast.success(`A driver has accepted your ride!`);
       }
     });
 
@@ -75,10 +82,12 @@ const CabLiveTracking = () => {
       <div className="flex-1 relative">
         <GoogleMap 
           mapContainerStyle={mapContainerStyle}
-          zoom={13}
-          center={driverLocation || { lat: 20.5937, lng: 78.9629 }} // Fallback center
+          zoom={booking ? 14 : 13}
+          center={driverLocation || (booking ? booking.cabBooking.pickupLocation : { lat: 20.5937, lng: 78.9629 })} 
         >
           {directions && <DirectionsRenderer directions={directions} />}
+          {booking && <Marker position={booking.cabBooking.pickupLocation} label="P" />}
+          {booking && <Marker position={booking.cabBooking.dropLocation} label="D" />}
           {driverLocation && <Marker position={driverLocation} icon={{ url: '/car-icon.png', scaledSize: new window.google.maps.Size(40, 40) }} />}
         </GoogleMap>
 

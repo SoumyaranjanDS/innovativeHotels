@@ -4,7 +4,7 @@ import api from '../api/axios';
 import { toast } from 'react-toastify';
 
 const AdminDashboard = () => {
-  const [data, setData] = useState({ unapprovedHotels: [], unapprovedCabs: [], pendingFees: [] });
+  const [data, setData] = useState({ unapprovedHotels: [], unapprovedHotelCabs: [], unapprovedIndependentCabs: [], pendingFees: [] });
   const [loading, setLoading] = useState(true);
 
   const fetchStats = async () => {
@@ -22,95 +22,50 @@ const AdminDashboard = () => {
     fetchStats();
   }, []);
 
-  const handleApprove = async (id, type) => {
-    try {
-      await api.post('/admin/approve', { id, type });
-      toast.success(`${type} Approved!`);
-      fetchStats();
-    } catch (err) {
-      toast.error(`Failed to approve ${type}`);
-    }
-  };
-
-  const handleCollectFee = async (feeId) => {
-    try {
-      await api.put(`/admin/fees/${feeId}/collect`);
-      toast.success('Fee marked as collected!');
-      fetchStats();
-    } catch (err) {
-      toast.error('Failed to collect fee');
-    }
-  };
-
   if (loading) return <div className="p-8">Loading Dashboard...</div>;
 
   return (
-    <div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        
-        {/* Provider Approvals */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-            <h2 className="text-lg font-bold text-gray-800">Pending Provider Approvals</h2>
-            <span className="bg-red-100 text-red-800 font-bold px-3 py-1 rounded-full text-sm">
-              {data.unapprovedHotels.length + data.unapprovedCabs.length}
-            </span>
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Dashboard Overview</h2>
+        <p className="text-gray-500">Welcome back to the Admin Portal. Here is your system snapshot.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+          <div className="text-gray-500 font-medium mb-4 flex justify-between items-center">
+            Pending Hotel Approvals
+            <span className="bg-blue-50 text-blue-600 p-2 rounded-lg">🏨</span>
           </div>
-          <div className="p-0 max-h-96 overflow-y-auto">
-            {data.unapprovedHotels.length === 0 && data.unapprovedCabs.length === 0 ? (
-               <div className="p-8 text-center text-gray-500">No pending approvals.</div>
-            ) : (
-              <ul className="divide-y divide-gray-100">
-                {data.unapprovedHotels.map(h => (
-                  <li key={h._id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition">
-                    <div>
-                      <p className="font-semibold text-gray-800">{h.hotelName}</p>
-                      <p className="text-xs font-bold text-blue-600 bg-blue-100 inline-block px-2 py-0.5 rounded mt-1">HOTEL</p>
-                    </div>
-                    <button onClick={() => handleApprove(h._id, 'Hotel')} className="text-sm bg-green-600 text-white px-4 py-2 rounded font-bold hover:bg-green-700 transition">Approve</button>
-                  </li>
-                ))}
-                {data.unapprovedCabs.map(c => (
-                  <li key={c._id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition">
-                    <div>
-                      <p className="font-semibold text-gray-800">{c.driverName || 'Cab Driver'}</p>
-                      <p className="text-xs font-bold text-yellow-600 bg-yellow-100 inline-block px-2 py-0.5 rounded mt-1">CAB</p>
-                    </div>
-                    <button onClick={() => handleApprove(c._id, 'Cab')} className="text-sm bg-green-600 text-white px-4 py-2 rounded font-bold hover:bg-green-700 transition">Approve</button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <div className="text-3xl font-bold text-gray-900">{data.unapprovedHotels.length}</div>
+          <Link to="/admin/approvals/hotels" className="text-sm text-primary font-medium mt-4 hover:underline">Review requests →</Link>
         </div>
 
-        {/* Platform Fees Collection */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-            <h2 className="text-lg font-bold text-gray-800">Pending COD Commissions</h2>
-            <span className="bg-yellow-100 text-yellow-800 font-bold px-3 py-1 rounded-full text-sm">
-              {data.pendingFees.length} Pending
-            </span>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+          <div className="text-gray-500 font-medium mb-4 flex justify-between items-center">
+            Pending Cab Approvals
+            <span className="bg-green-50 text-green-600 p-2 rounded-lg">🚕</span>
           </div>
-          <div className="p-0 max-h-96 overflow-y-auto">
-            {data.pendingFees.length === 0 ? (
-               <div className="p-8 text-center text-gray-500">All commissions collected!</div>
-            ) : (
-              <ul className="divide-y divide-gray-100">
-                {data.pendingFees.map(f => (
-                  <li key={f._id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition">
-                    <div>
-                      <p className="font-semibold text-gray-800">Provider: {f.providerId?.name}</p>
-                      <p className="text-sm text-gray-500">Collected COD: ₹{f.totalFareAmount} | Platform Fee: <strong className="text-primary">₹{f.platformFeeAmount}</strong></p>
-                    </div>
-                    <button onClick={() => handleCollectFee(f._id)} className="text-sm bg-primary text-white px-4 py-2 rounded font-bold hover:bg-primary-light transition">Collect</button>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="text-3xl font-bold text-gray-900">
+            {data.unapprovedHotelCabs.length + data.unapprovedIndependentCabs.length}
           </div>
+          <Link to="/admin/approvals/cabs" className="text-sm text-primary font-medium mt-4 hover:underline">Review requests →</Link>
         </div>
 
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+          <div className="text-gray-500 font-medium mb-4 flex justify-between items-center">
+            Pending Fee Settlements
+            <span className="bg-purple-50 text-purple-600 p-2 rounded-lg">💰</span>
+          </div>
+          <div className="text-3xl font-bold text-gray-900">{data.pendingFees.length}</div>
+          <Link to="/admin/settlements" className="text-sm text-primary font-medium mt-4 hover:underline">Manage settlements →</Link>
+        </div>
+
+        <div className="bg-gradient-to-br from-primary to-primary-dark p-6 rounded-2xl shadow-md text-white flex flex-col justify-between">
+          <div className="font-medium mb-4 opacity-90">System Status</div>
+          <div className="text-xl font-bold">All Systems Operational</div>
+          <div className="text-sm opacity-80 mt-4">Last checked just now</div>
+        </div>
       </div>
     </div>
   );

@@ -21,8 +21,9 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await register(formData);
-      if (formData.role === 'Provider') {
+      const payload = { ...formData };
+      await register(payload);
+      if (payload.role === 'Provider') {
         navigate('/provider/onboarding/select-service');
       } else {
         navigate('/');
@@ -107,7 +108,7 @@ const Register = () => {
                   name="role"
                   value="Customer"
                   checked={formData.role === 'Customer'}
-                  onChange={handleChange}
+                  onChange={(e) => setFormData({ ...formData, role: 'Customer' })}
                   className="w-4 h-4 text-primary focus:ring-primary"
                 />
                 <span className="ml-2 text-gray-700 font-medium text-sm">Customer</span>
@@ -118,7 +119,7 @@ const Register = () => {
                   name="role"
                   value="Provider"
                   checked={formData.role === 'Provider'}
-                  onChange={handleChange}
+                  onChange={(e) => setFormData({ ...formData, role: 'Provider' })}
                   className="w-4 h-4 text-primary focus:ring-primary"
                 />
                 <span className="ml-2 text-gray-700 font-medium text-sm">Service Provider</span>

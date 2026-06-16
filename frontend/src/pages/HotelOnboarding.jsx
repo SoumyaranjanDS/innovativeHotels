@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../api/axios';
 
@@ -8,6 +8,7 @@ const HotelOnboarding = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    ownerName: '',
     address: {
       street: '',
       city: '',
@@ -17,8 +18,10 @@ const HotelOnboarding = () => {
     },
     contactNumber: '',
     email: '',
-    description: ''
+    description: '',
+    propertyPhoto: null
   });
+  const [photoFile, setPhotoFile] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -40,7 +43,17 @@ const HotelOnboarding = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post('/providers/hotel-service', formData);
+      let photoUrl = '';
+      if (photoFile) {
+        const uploadData = new FormData();
+        uploadData.append('file', photoFile);
+        const uploadRes = await api.post('/upload', uploadData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        photoUrl = uploadRes.data.url;
+      }
+
+      await api.post('/providers/hotel-service', { ...formData, propertyPhoto: photoUrl });
       toast.success('Hotel profile created successfully! Pending admin approval.');
       navigate('/provider/dashboard');
     } catch (err) {
@@ -51,8 +64,14 @@ const HotelOnboarding = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <div className="min-h-screen bg-gray-50 py-12 px-4 relative">
+      <div className="absolute top-4 left-4 md:top-8 md:left-8">
+        <Link to="/provider/dashboard" className="flex items-center gap-2 text-gray-500 hover:text-primary transition font-medium bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-100">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          Back to Dashboard
+        </Link>
+      </div>
+      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mt-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Hotel Onboarding</h1>
         <p className="text-gray-500 mb-8">Register your hotel property to start receiving bookings.</p>
         
@@ -61,6 +80,11 @@ const HotelOnboarding = () => {
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Hotel Name *</label>
               <input type="text" name="name" required value={formData.name} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="Grand Plaza Hotel" />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Owner Name *</label>
+              <input type="text" name="ownerName" required value={formData.ownerName} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="John Doe" />
             </div>
 
             <div>
@@ -76,6 +100,12 @@ const HotelOnboarding = () => {
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea name="description" rows="4" value={formData.description} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary outline-none" placeholder="Tell us about your property..."></textarea>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Hotel Image</label>
+              <input type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files[0])} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary outline-none" />
+              <p className="text-xs text-gray-500 mt-1">Upload a clear photo of your hotel exterior or lobby.</p>
             </div>
 
             <div className="md:col-span-2 border-t pt-6 mt-2">

@@ -2,13 +2,21 @@ const mongoose = require('mongoose');
 
 const cabVendorSchema = new mongoose.Schema({
   providerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  cabSourceType: { type: String, enum: ['HOTEL_LINKED', 'INDEPENDENT'], default: 'INDEPENDENT' },
+  driverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  driverCredentials: {
+    loginId: { type: String },
+    password: { type: String }
+  },
+  hotelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hotel' },
   vendorDetails: {
     driverName: String,
     fleetCompanyName: String,
     mobile: String,
     email: String,
     address: String,
-    emergencyContact: String
+    emergencyContact: String,
+    driverPhoto: String
   },
   documents: {
     drivingLicense: String,
@@ -35,6 +43,8 @@ const cabVendorSchema = new mongoose.Schema({
   },
   lastLocationUpdatedAt: Date,
   isApproved: { type: Boolean, default: false },
+  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  rejectionReason: { type: String },
   serviceStatus: { type: String, enum: ['active', 'inactive', 'suspended'], default: 'active' }
 }, { timestamps: true });
 

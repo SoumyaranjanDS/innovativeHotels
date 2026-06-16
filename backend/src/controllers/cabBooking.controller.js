@@ -49,9 +49,12 @@ exports.getFareEstimate = async (req, res) => {
           distanceFare,
           timeFare,
           taxAmount,
-          minimumFareApplied
+          minimumFareApplied,
+          platformCommissionType: fareRule.platformCommissionType || 'percentage',
+          platformCommissionValue: fareRule.platformCommissionValue || 10,
         },
-        estimatedFare: grandTotal.toFixed(2)
+        estimatedFare: grandTotal.toFixed(2),
+        availableCabSources: ['INDEPENDENT'] // We can enhance this to check db for actual available sources
       }
     });
 
@@ -64,7 +67,7 @@ exports.getFareEstimate = async (req, res) => {
 // Create Cab Booking (COD)
 exports.createCabBooking = async (req, res) => {
   try {
-    const { pickupLocation, dropLocation, pickupDateTime, tripType, passengers, vehicleType } = req.body;
+    const { pickupLocation, dropLocation, pickupDateTime, tripType, passengers, vehicleType, hotelBookingId, hotelId, cabSourcePreference } = req.body;
     
     // Recalculate distance to prevent frontend tampering
     const originStr = `${pickupLocation.lat},${pickupLocation.lng}`;
@@ -73,13 +76,18 @@ exports.createCabBooking = async (req, res) => {
 
     const vType = vehicleType || 'Mini';
     const fareRule = await CabFareRule.findOne({ vehicleType: vType, isActive: true }) || 
-      { baseFare: 50, perKmRate: 15, perMinuteRate: 1, minimumFare: 100, taxPercent: 5 };
+      { baseFare: 50, perKmRate: 15, perMinuteRate: 1, minimumFare: 100, taxPercent: 5, platformCommissionType: 'percentage', platformCommissionValue: 10 };
 
     const distanceFare = distanceKm * fareRule.perKmRate;
     const timeFare = durationMinutes * fareRule.perMinuteRate;
     const subTotal = fareRule.baseFare + distanceFare + timeFare;
     const taxAmount = (subTotal * fareRule.taxPercent) / 100;
     const grandTotal = Math.max(subTotal + taxAmount, fareRule.minimumFare);
+    
+    const platformFee = fareRule.platformCommissionType === 'fixed' 
+        ? fareRule.platformCommissionValue 
+        : (grandTotal * (fareRule.platformCommissionValue || 10)) / 100;
+    const providerEarning = grandTotal - platformFee;
 
     // Create Booking
     const booking = new Booking({
@@ -87,6 +95,9 @@ exports.createCabBooking = async (req, res) => {
       userId: req.user.id,
       bookingType: 'CAB',
       cabBooking: {
+        hotelBookingId,
+        hotelId,
+        cabSourcePreference: cabSourcePreference || 'ANY',
         pickupLocation,
         dropLocation,
         pickupDateTime,
@@ -100,7 +111,11 @@ exports.createCabBooking = async (req, res) => {
           distanceFare,
           timeFare,
           taxAmount,
-          minimumFareApplied: grandTotal === fareRule.minimumFare
+          minimumFareApplied: grandTotal === fareRule.minimumFare,
+          platformCommissionType: fareRule.platformCommissionType || 'percentage',
+          platformCommissionValue: fareRule.platformCommissionValue || 10,
+          platformFee,
+          providerEarning
         },
         status: 'requested'
       },
@@ -111,34 +126,65 @@ exports.createCabBooking = async (req, res) => {
 
     await booking.save();
 
-    // MATCHING: Find available drivers within 5km radius
-    const maxDistance = 5000; // 5km in meters
-    const nearbyDrivers = await CabVendor.find({
+    // MATCHING LOGIC
+    let nearbyDrivers = [];
+    const maxDistance = 5000; // 5km
+    const pref = cabSourcePreference || 'ANY';
+    const io = req.app.get('io');
+
+    if (pref === 'HOTEL_LINKED' && hotelId) {
+        // MANUAL ASSIGNMENT FOR HOTEL LINKED
+        // Do not broadcast to individual drivers. Just notify the hotel owner.
+        const Hotel = require('../models/Hotel');
+        const hotel = await Hotel.findById(hotelId);
+        if (hotel && io) {
+            io.to(`provider_${hotel.providerId.toString()}`).emit('new_hotel_cab_request', {
+                bookingId: booking._id,
+                pickupLocation,
+                dropLocation,
+                estimatedFare: grandTotal
+            });
+        }
+        res.status(201).json({
+            success: true,
+            message: 'Cab requested successfully. Hotel will assign a driver.',
+            booking,
+            driversNotified: 0
+        });
+        return;
+    }
+
+    let query = {
       'availability.isOnline': true,
       'availability.isAvailable': true,
       isApproved: true,
-      currentLocation: {
-        $near: {
-          $geometry: { type: 'Point', coordinates: [pickupLocation.lng, pickupLocation.lat] },
-          $maxDistance: maxDistance
-        }
+      cabSourceType: 'INDEPENDENT'
+    };
+
+    query.currentLocation = {
+      $near: {
+        $geometry: { type: 'Point', coordinates: [pickupLocation.lng, pickupLocation.lat] },
+        $maxDistance: maxDistance
       }
-    });
+    };
+    nearbyDrivers = await CabVendor.find(query);
 
     if (nearbyDrivers.length > 0) {
-      booking.cabBooking.status = 'notified_drivers';
+      booking.cabBooking.status = 'external_cabs_notified';
       await booking.save();
 
       // Create Notifications
       const notifications = nearbyDrivers.map(driver => ({
         bookingId: booking._id,
+        cabProviderId: driver._id,
         providerId: driver.providerId,
+        driverId: driver.driverId,
+        hotelId: driver.hotelId,
         status: 'sent'
       }));
       await RideNotification.insertMany(notifications);
 
-      // Emit Socket events (handled later)
-      const io = req.app.get('io');
+      // Emit Socket events
       if (io) {
         nearbyDrivers.forEach(driver => {
           io.to(`provider_${driver.providerId.toString()}`).emit('new_ride_request', {
@@ -155,7 +201,7 @@ exports.createCabBooking = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Booking created. Searching for drivers.',
+      message: 'Booking created. Searching for independent drivers.',
       booking,
       driversNotified: nearbyDrivers.length
     });

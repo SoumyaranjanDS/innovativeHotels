@@ -270,106 +270,130 @@ exports.checkAvailability = async (req, res) => {
 // @desc    Hold room for booking
 // @route   POST /api/hotels/hold
 exports.holdRoom = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
-    const { hotelId, roomId, checkInDate, checkOutDate, roomsCount, guests } = req.body;
-    const needed = parseInt(roomsCount) || 1;
+  const maxRetries = 3;
+  let attempt = 1;
+  const { hotelId, roomId, checkInDate, checkOutDate, roomsCount, guests } = req.body;
 
-    // Validate room belongs to hotel
-    const room = await Room.findOne({ _id: roomId, hotelId });
-    if (!room) throw new Error('Room not found for this hotel');
+  while (attempt <= maxRetries) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const needed = parseInt(roomsCount) || 1;
 
-    const dates = getStayDates(checkInDate, checkOutDate);
-    if (dates.length === 0) throw new Error('Invalid date range');
+      // Validate room belongs to hotel
+      const room = await Room.findOne({ _id: roomId, hotelId });
+      if (!room) throw new Error('Room not found for this hotel');
 
-    let totalBasePrice = 0;
+      const dates = getStayDates(checkInDate, checkOutDate);
+      if (dates.length === 0) throw new Error('Invalid date range');
 
-    for (const date of dates) {
-      let availability = await HotelAvailability.findOne({ hotelId, roomId, date }).session(session);
+      let totalBasePrice = 0;
 
-      if (!availability) {
-        // Create availability record on the fly
-        availability = new HotelAvailability({
-          hotelId,
-          roomId,
-          date,
-          totalRooms: room.totalRooms,
-          bookedRooms: 0,
-          heldRooms: 0,
-          basePrice: room.price,
-          finalPrice: room.price,
-          isBlocked: false
-        });
-        await availability.save({ session });
+      for (const date of dates) {
+        // Use findOneAndUpdate with upsert to avoid duplicate key errors during high concurrency
+        let availability = await HotelAvailability.findOneAndUpdate(
+          { hotelId, roomId, date },
+          { 
+            $setOnInsert: {
+              totalRooms: room.totalRooms,
+              bookedRooms: 0,
+              heldRooms: 0,
+              basePrice: room.price,
+              finalPrice: room.price,
+              isBlocked: false
+            }
+          },
+          { upsert: true, new: true, session }
+        );
+
+        if (availability.isBlocked) throw new Error(`Room blocked for ${date.toLocaleDateString()}`);
+
+        const availableCount = availability.totalRooms - availability.bookedRooms - availability.heldRooms;
+        if (availableCount < needed) {
+          throw new Error('Sorry, this room is no longer available for the selected dates. Please choose another room.');
+        }
+
+        const updateResult = await HotelAvailability.updateOne(
+          { 
+             _id: availability._id, 
+             $expr: { $gte: [{ $subtract: ["$totalRooms", { $add: ["$bookedRooms", "$heldRooms"] }] }, needed] } 
+          },
+          { $inc: { heldRooms: needed } },
+          { session }
+        );
+
+        if (updateResult.modifiedCount === 0) {
+          throw new Error('Sorry, this room is no longer available for the selected dates due to high demand.');
+        }
+
+        totalBasePrice += availability.finalPrice * needed;
       }
-      if (availability.isBlocked) throw new Error(`Room blocked for ${date.toLocaleDateString()}`);
 
-      const availableCount = availability.totalRooms - availability.bookedRooms - availability.heldRooms;
-      if (availableCount < needed) {
-        throw new Error('Sorry, this room is no longer available for the selected dates. Please choose another room.');
+      const holdCode = uuidv4();
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+      const taxAmount = Math.round(totalBasePrice * (room.taxPercent || 18) / 100);
+      const discountAmount = Math.round(totalBasePrice * (room.discountPercent || 0) / 100);
+
+      const newHold = await BookingHold.create([{
+        holdCode,
+        userId: req.user.id,
+        hotelId,
+        roomId,
+        checkInDate,
+        checkOutDate,
+        dates,
+        roomsCount: needed,
+        guests: guests || { adults: 1, children: 0 },
+        priceSnapshot: {
+          basePrice: totalBasePrice,
+          taxAmount,
+          discountAmount,
+          totalPrice: totalBasePrice + taxAmount - discountAmount
+        },
+        expiresAt
+      }], { session });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      // Fetch hotel & room info for the response
+      const hotel = await Hotel.findById(hotelId);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Room held successfully',
+        hold: {
+          ...newHold[0].toObject(),
+          hotelName: hotel?.profile?.hotelName || 'Hotel',
+          hotelAddress: hotel?.partnerDetails?.address || '',
+          hotelCity: hotel?.partnerDetails?.city || '',
+          roomType: room.roomType,
+          roomAmenities: room.amenities,
+          checkInTime: hotel?.profile?.checkInTime || '14:00',
+          checkOutTime: hotel?.profile?.checkOutTime || '11:00',
+          cancellationPolicy: hotel?.policies?.cancellation || 'Standard cancellation policy',
+        }
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+
+      if (
+        (error.hasErrorLabel && error.hasErrorLabel('TransientTransactionError')) || 
+        (error.message && error.message.toLowerCase().includes('write conflict'))
+      ) {
+        if (attempt === maxRetries) {
+          return res.status(500).json({ success: false, message: 'Server is currently busy. Please try again.' });
+        }
+        attempt++;
+        await new Promise(resolve => setTimeout(resolve, 300 * attempt));
+        continue;
       }
 
-      await HotelAvailability.updateOne(
-        { _id: availability._id, $expr: { $gte: [{ $subtract: ["$totalRooms", { $add: ["$bookedRooms", "$heldRooms"] }] }, needed] } },
-        { $inc: { heldRooms: needed } },
-        { session }
-      );
-
-      totalBasePrice += availability.finalPrice * needed;
+      return res.status(400).json({ success: false, message: error.message });
     }
-
-    const holdCode = uuidv4();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
-
-    const taxAmount = Math.round(totalBasePrice * (room.taxPercent || 18) / 100);
-    const discountAmount = Math.round(totalBasePrice * (room.discountPercent || 0) / 100);
-
-    const newHold = await BookingHold.create([{
-      holdCode,
-      userId: req.user.id,
-      hotelId,
-      roomId,
-      checkInDate,
-      checkOutDate,
-      dates,
-      roomsCount: needed,
-      guests: guests || { adults: 1, children: 0 },
-      priceSnapshot: {
-        basePrice: totalBasePrice,
-        taxAmount,
-        discountAmount,
-        totalPrice: totalBasePrice + taxAmount - discountAmount
-      },
-      expiresAt
-    }], { session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    // Fetch hotel & room info for the response
-    const hotel = await Hotel.findById(hotelId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Room held successfully',
-      hold: {
-        ...newHold[0].toObject(),
-        hotelName: hotel?.profile?.hotelName || 'Hotel',
-        hotelAddress: hotel?.partnerDetails?.address || '',
-        hotelCity: hotel?.partnerDetails?.city || '',
-        roomType: room.roomType,
-        roomAmenities: room.amenities,
-        checkInTime: hotel?.profile?.checkInTime || '14:00',
-        checkOutTime: hotel?.profile?.checkOutTime || '11:00',
-        cancellationPolicy: hotel?.policies?.cancellation || 'Standard cancellation policy',
-      }
-    });
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    res.status(400).json({ success: false, message: error.message });
   }
 };
 
@@ -400,6 +424,9 @@ exports.confirmBooking = async (req, res) => {
     }
 
     const bookingId = `HTL-${uuidv4().substring(0, 8).toUpperCase()}`;
+    // Generate 6-digit OTP for check-in
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const checkoutOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
     const booking = await Booking.create([{
       bookingId,
@@ -417,6 +444,8 @@ exports.confirmBooking = async (req, res) => {
         guestDetails: guestDetails || {},
         needPickupCab: needPickupCab || 'no',
         status: hotelStatus,
+        otp,
+        checkoutOtp,
       },
       paymentMode: paymentMode || 'online',
       paymentStatus,

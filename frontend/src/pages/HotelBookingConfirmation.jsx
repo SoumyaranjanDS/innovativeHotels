@@ -3,8 +3,6 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
 import { CheckCircle, MapPin, Calendar, Clock, Users, CreditCard, Car, ExternalLink } from 'lucide-react';
-import HotelCabSuggestion from '../components/cab/HotelCabSuggestion';
-import CabSuggestionBox from '../components/booking/CabSuggestionBox';
 
 const HotelBookingConfirmation = () => {
   const { bookingId } = useParams();
@@ -60,14 +58,7 @@ const HotelBookingConfirmation = () => {
           <p className={`${isPendingApproval ? 'text-indigo-600' : 'text-green-600'} mt-2`}>Booking ID: <strong className={isPendingApproval ? 'text-indigo-800' : 'text-green-800'}>{booking.bookingId}</strong></p>
         </div>
 
-        {/* Cab Suggestion */}
-        {hb && (
-          <HotelCabSuggestion 
-            hotelId={hb.hotelId} 
-            hotelBookingId={booking._id} 
-            hotelAddress={`${booking.hotelAddress}, ${booking.hotelCity}`.replace(/^,\s/, '')} 
-          />
-        )}
+
 
         {/* Booking Details */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
@@ -133,12 +124,7 @@ const HotelBookingConfirmation = () => {
           )}
         </div>
 
-        {/* Cab Suggestion */}
-        {(hb.needPickupCab === 'yes' || hb.needPickupCab === 'later') && (
-          <div className="mb-6">
-            <CabSuggestionBox hotelBookingId={booking._id} hotelAddress={`${booking.hotelAddress}, ${booking.hotelCity}`} />
-          </div>
-        )}
+
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-4 justify-center">

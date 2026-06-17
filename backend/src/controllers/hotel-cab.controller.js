@@ -158,7 +158,11 @@ exports.getHotelCabBookings = async (req, res, next) => {
       bookingType: 'CAB',
       'cabBooking.hotelId': hotel._id,
       'cabBooking.cabSourceType': 'HOTEL_LINKED'
-    }).populate('userId', 'name email').populate('cabBooking.vendorId').populate('cabBooking.vehicleId');
+    })
+    .populate('userId', 'name email')
+    .populate('cabBooking.vendorId')
+    .populate('cabBooking.vehicleId')
+    .populate('cabBooking.hotelBookingId', 'hotelBooking.status');
 
     res.status(200).json({
       success: true,
@@ -296,10 +300,14 @@ exports.assignCabBooking = async (req, res, next) => {
       bookingType: 'CAB',
       'cabBooking.hotelId': hotel._id,
       'cabBooking.status': 'requested'
-    });
+    }).populate('cabBooking.hotelBookingId');
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Cab booking request not found or already processed' });
+    }
+
+    if (booking.cabBooking?.hotelBookingId && booking.cabBooking.hotelBookingId.hotelBooking?.status === 'pending_approval') {
+      return res.status(400).json({ success: false, message: 'Cannot assign a cab until the associated hotel booking is approved.' });
     }
 
     // Verify vendor belongs to this hotel
@@ -313,6 +321,9 @@ exports.assignCabBooking = async (req, res, next) => {
     booking.cabBooking.assignedCabProviderId = vendorId;
     booking.cabBooking.vehicleId = vehicleId;
     booking.cabBooking.acceptedAt = new Date();
+    if (!booking.cabBooking.otp) {
+      booking.cabBooking.otp = Math.floor(100000 + Math.random() * 900000).toString();
+    }
 
     await booking.save();
 
@@ -347,6 +358,82 @@ exports.assignCabBooking = async (req, res, next) => {
     }
 
     res.status(200).json({ success: true, message: 'Cab successfully assigned', booking });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.verifyCabOTP = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { otp } = req.body;
+
+    const hotel = await Hotel.findOne({ providerId: req.user.id });
+    if (!hotel) return res.status(404).json({ success: false, message: 'Hotel not found' });
+
+    const booking = await Booking.findOne({
+      _id: id,
+      bookingType: 'CAB',
+      'cabBooking.hotelId': hotel._id,
+    });
+
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+
+    if (booking.cabBooking.otp !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+
+    booking.cabBooking.status = 'trip_started';
+    booking.cabBooking.startedAt = new Date();
+    booking.cabBooking.statusLogs.push({
+      status: 'trip_started',
+      timestamp: new Date()
+    });
+
+    await booking.save();
+
+    res.status(200).json({ success: true, message: 'OTP verified. Trip started.', booking });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateCabStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const hotel = await Hotel.findOne({ providerId: req.user.id });
+    if (!hotel) return res.status(404).json({ success: false, message: 'Hotel not found' });
+
+    const booking = await Booking.findOne({
+      _id: id,
+      bookingType: 'CAB',
+      'cabBooking.hotelId': hotel._id,
+    });
+
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+
+    booking.cabBooking.status = status;
+    booking.cabBooking.statusLogs.push({
+      status: status,
+      timestamp: new Date()
+    });
+
+    if (status === 'completed') {
+      booking.cabBooking.completedAt = new Date();
+      if (booking.cabBooking.vendorId) {
+        const vendor = await CabVendor.findById(booking.cabBooking.vendorId);
+        if (vendor) {
+          vendor.availability.isAvailable = true;
+          await vendor.save();
+        }
+      }
+    }
+
+    await booking.save();
+
+    res.status(200).json({ success: true, message: `Cab status updated to ${status}`, booking });
   } catch (error) {
     next(error);
   }

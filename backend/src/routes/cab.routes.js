@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getFareEstimate, createCabBooking } = require('../controllers/cabBooking.controller');
-const { acceptRide, updateRideStatus, getRideRequests, getActiveRide, updateLocation } = require('../controllers/cabDriver.controller');
+const { acceptRide, updateRideStatus, getRideRequests, getActiveRide, updateLocation, verifyOTP } = require('../controllers/cabDriver.controller');
 const { protect, authorize } = require('../middlewares/auth');
 
 // Customer Routes
@@ -15,5 +15,6 @@ router.get('/driver/rides/current', protect, authorize('Provider'), getActiveRid
 router.patch('/driver/location', protect, authorize('Provider'), updateLocation);
 router.post('/driver/ride-requests/:bookingId/accept', protect, authorize('Provider'), acceptRide);
 router.patch('/driver/rides/:bookingId/status', protect, authorize('Provider'), updateRideStatus);
+router.post('/driver/rides/:bookingId/verify-otp', protect, authorize('Provider'), verifyOTP);
 
 module.exports = router;

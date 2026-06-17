@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LayoutDashboard, Building2, Car, FileText, Wallet, LogOut, MapPin, ClipboardList, Star } from 'lucide-react';
 
 const ProviderLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeService, setActiveService] = useState(user?.providerType === 'Cab' ? 'cab' : 'hotel');
 
   const handleLogout = () => {
@@ -45,16 +46,37 @@ const ProviderLayout = () => {
 
           {/* Navigation */}
           <nav className="space-y-1">
-            <Link to={user?.providerType === 'Driver' ? "/provider/driver-dashboard" : "/provider/dashboard"} className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-primary/10 text-primary font-semibold text-sm">
+            <Link 
+              to={user?.providerType === 'Driver' ? "/provider/driver-dashboard" : "/provider/dashboard"} 
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg font-semibold text-sm transition ${
+                location.pathname === (user?.providerType === 'Driver' ? "/provider/driver-dashboard" : "/provider/dashboard")
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-primary'
+              }`}
+            >
               <LayoutDashboard size={16} /> Dashboard
             </Link>
 
             {activeService === 'hotel' && user?.providerType !== 'Driver' && (
               <>
-                <Link to="/provider/hotel/rooms" className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-primary transition text-sm">
+                <Link 
+                  to="/provider/hotel/rooms" 
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition ${
+                    location.pathname === '/provider/hotel/rooms'
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-primary font-medium'
+                  }`}
+                >
                   <ClipboardList size={16} /> Manage Rooms
                 </Link>
-                <Link to="/provider/hotel/bookings" className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-primary transition text-sm">
+                <Link 
+                  to="/provider/hotel/bookings" 
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition ${
+                    location.pathname === '/provider/hotel/bookings'
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-primary font-medium'
+                  }`}
+                >
                   <FileText size={16} /> Hotel Bookings
                 </Link>
               </>
@@ -62,13 +84,34 @@ const ProviderLayout = () => {
 
             {user?.providerType !== 'Driver' && (
               <>
-                <Link to="/provider/documents" className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-primary transition text-sm">
+                <Link 
+                  to="/provider/documents" 
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition ${
+                    location.pathname === '/provider/documents'
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-primary font-medium'
+                  }`}
+                >
                   <FileText size={16} /> Documents
                 </Link>
-                <Link to="/provider/earnings" className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-primary transition text-sm">
+                <Link 
+                  to="/provider/earnings" 
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition ${
+                    location.pathname === '/provider/earnings'
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-primary font-medium'
+                  }`}
+                >
                   <Wallet size={16} /> Earnings
                 </Link>
-                <Link to="/provider/reviews" className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-primary transition text-sm">
+                <Link 
+                  to="/provider/reviews" 
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition ${
+                    location.pathname === '/provider/reviews'
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-primary font-medium'
+                  }`}
+                >
                   <Star size={16} /> Customer Reviews
                 </Link>
               </>

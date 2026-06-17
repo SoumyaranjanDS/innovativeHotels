@@ -88,6 +88,11 @@ exports.acceptRide = async (req, res) => {
       { new: true }
     );
 
+    if (booking && !booking.cabBooking.otp) {
+      booking.cabBooking.otp = Math.floor(100000 + Math.random() * 900000).toString();
+      await booking.save();
+    }
+
     if (!booking) {
       return res.status(400).json({ success: false, message: 'Ride no longer available or already accepted.' });
     }
@@ -175,6 +180,46 @@ exports.updateRideStatus = async (req, res) => {
       io.to(`user_${booking.userId.toString()}`).emit('ride_status_changed', {
         bookingId: booking._id,
         status
+      });
+    }
+
+    res.json({ success: true, booking });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.verifyOTP = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { otp, lat, lng } = req.body;
+
+    const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
+    const booking = await Booking.findOne({ _id: bookingId, 'cabBooking.vendorId': vendor._id });
+
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    
+    if (booking.cabBooking.otp !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP. Please try again.' });
+    }
+
+    booking.cabBooking.status = 'trip_started';
+    booking.cabBooking.startedAt = new Date();
+    booking.cabBooking.statusLogs.push({
+      status: 'trip_started',
+      timestamp: new Date(),
+      location: lat && lng ? { lat, lng } : null
+    });
+
+    await booking.save();
+
+    // Notify Customer
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${booking.userId.toString()}`).emit('ride_status_changed', {
+        bookingId: booking._id,
+        status: 'trip_started'
       });
     }
 

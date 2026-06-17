@@ -89,6 +89,9 @@ exports.createCabBooking = async (req, res) => {
         : (grandTotal * (fareRule.platformCommissionValue || 10)) / 100;
     const providerEarning = grandTotal - platformFee;
 
+    // Generate independent Cab OTP
+    let otp = Math.floor(100000 + Math.random() * 900000).toString();
+
     // Create Booking
     const booking = new Booking({
       bookingId: `CAB-${Date.now()}`,
@@ -118,7 +121,8 @@ exports.createCabBooking = async (req, res) => {
           platformFee,
           providerEarning
         },
-        status: 'requested'
+        status: 'requested',
+        otp: otp
       },
       paymentMode: 'cod',
       paymentStatus: 'cod_pending',

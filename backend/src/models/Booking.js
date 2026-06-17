@@ -40,6 +40,8 @@ const bookingSchema = new mongoose.Schema(
         enum: ["yes", "no", "later"],
         default: "no",
       },
+      otp: String,
+      checkoutOtp: String,
       cancellationReason: String,
       modificationRequest: {
         requestedAt: Date,
@@ -112,6 +114,7 @@ const bookingSchema = new mongoose.Schema(
         taxAmount: Number,
         minimumFareApplied: Boolean,
       },
+      otp: String,
       acceptedAt: Date,
       startedAt: Date,
       completedAt: Date,

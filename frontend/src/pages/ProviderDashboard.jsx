@@ -31,6 +31,11 @@ const ProviderDashboard = () => {
   const [assignFormData, setAssignFormData] = useState({ vendorId: '' });
   const [assigningLoading, setAssigningLoading] = useState(false);
 
+  // Cab OTP & Status
+  const [cabOtp, setCabOtp] = useState('');
+  const [verifyingCabOtp, setVerifyingCabOtp] = useState(false);
+  const [completingTrip, setCompletingTrip] = useState(false);
+
   const fetchData = async () => {
     try {
       const statusRes = await api.get('/providers/status');
@@ -150,6 +155,37 @@ const ProviderDashboard = () => {
       toast.error(error.response?.data?.message || 'Failed to assign driver');
     } finally {
       setAssigningLoading(false);
+    }
+  };
+
+  const handleVerifyCabOtp = async (bookingId) => {
+    if (!cabOtp || cabOtp.length !== 6) {
+      toast.error("Please enter a valid 6-digit OTP.");
+      return;
+    }
+    setVerifyingCabOtp(true);
+    try {
+      await api.patch(`/hotel-cabs/bookings/${bookingId}/verify-otp`, { otp: cabOtp });
+      toast.success("OTP Verified! Trip Started.");
+      setCabOtp('');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Invalid OTP.");
+    } finally {
+      setVerifyingCabOtp(false);
+    }
+  };
+
+  const handleCompleteCabTrip = async (bookingId) => {
+    setCompletingTrip(true);
+    try {
+      await api.patch(`/hotel-cabs/bookings/${bookingId}/status`, { status: 'completed' });
+      toast.success("Trip completed successfully.");
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to complete trip.");
+    } finally {
+      setCompletingTrip(false);
     }
   };
 
@@ -355,17 +391,21 @@ const ProviderDashboard = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {booking.cabBooking?.vehicleType}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex flex-col items-start gap-1">
                             <button
+                              disabled={booking.cabBooking?.hotelBookingId?.hotelBooking?.status === 'pending_approval'}
                               onClick={() => {
                                 setSelectedCabRequest(booking);
                                 setAssignFormData({ vendorId: '' });
                                 setShowAssignModal(true);
                               }}
-                              className="bg-primary text-white px-3 py-1.5 rounded hover:bg-primary-light transition text-xs font-bold"
+                              className={`bg-primary text-white px-3 py-1.5 rounded hover:bg-primary-light transition text-xs font-bold ${booking.cabBooking?.hotelBookingId?.hotelBooking?.status === 'pending_approval' ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                               Assign Driver
                             </button>
+                            {booking.cabBooking?.hotelBookingId?.hotelBooking?.status === 'pending_approval' && (
+                              <span className="text-[10px] text-red-500 font-semibold">Approve hotel booking first</span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -392,6 +432,37 @@ const ProviderDashboard = () => {
                         <div className="mt-auto pt-2 border-t border-gray-200">
                           <p className="text-xs text-gray-500">Assigned Driver:</p>
                           <p className="text-sm font-semibold text-gray-800">{booking.cabBooking?.vendorId?.vendorDetails?.driverName || 'Unknown'}</p>
+                        </div>
+                        
+                        <div className="mt-4">
+                          {['assigned', 'on_the_way', 'arrived_at_pickup'].includes(booking.cabBooking?.status) && (
+                            <div className="flex flex-col gap-2">
+                              <input 
+                                type="text" 
+                                placeholder="Enter 6-digit OTP" 
+                                maxLength={6}
+                                value={cabOtp}
+                                onChange={(e) => setCabOtp(e.target.value)}
+                                className="border border-gray-300 rounded-lg p-2 text-sm text-center tracking-widest focus:ring-primary focus:border-primary"
+                              />
+                              <button 
+                                onClick={() => handleVerifyCabOtp(booking._id)}
+                                disabled={verifyingCabOtp || cabOtp.length !== 6}
+                                className={`w-full py-2 rounded-lg text-sm font-bold text-white transition ${cabOtp.length !== 6 || verifyingCabOtp ? 'bg-gray-300 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark'}`}
+                              >
+                                {verifyingCabOtp ? 'Verifying...' : 'Verify OTP & Start Trip'}
+                              </button>
+                            </div>
+                          )}
+                          {booking.cabBooking?.status === 'trip_started' && (
+                            <button 
+                              onClick={() => handleCompleteCabTrip(booking._id)}
+                              disabled={completingTrip}
+                              className="w-full py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-bold transition"
+                            >
+                              {completingTrip ? 'Processing...' : 'Complete Trip'}
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

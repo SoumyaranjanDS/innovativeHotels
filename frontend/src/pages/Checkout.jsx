@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../api/axios';
-import { Clock, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Clock, ShieldCheck, AlertCircle, MapPin, Navigation } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLoadScript, Autocomplete } from '@react-google-maps/api';
+
+const libraries = ['places'];
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -17,8 +20,14 @@ const Checkout = () => {
   const guests = searchParams.get('guests') || '1';
   const rooms = searchParams.get('rooms') || '1';
 
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries
+  });
+
   const [timeLeft, setTimeLeft] = useState(0);
   const [holdData, setHoldData] = useState(null);
+  const [hotelDetails, setHotelDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [paymentMode, setPaymentMode] = useState('online');
@@ -34,7 +43,19 @@ const Checkout = () => {
     additionalGuests: [],
     specialRequest: '',
   });
+  
   const [needPickupCab, setNeedPickupCab] = useState('no');
+  const [pickupAddress, setPickupAddress] = useState('');
+  const [pickupLocation, setPickupLocation] = useState(null);
+  const [cabDistance, setCabDistance] = useState(null);
+  const [cabPrice, setCabPrice] = useState(null);
+  const [cabConfirmed, setCabConfirmed] = useState(false);
+  
+  const [dropAddress, setDropAddress] = useState('');
+  const [dropLocation, setDropLocation] = useState(null);
+  
+  const autocompleteRef = useRef(null);
+  const dropAutocompleteRef = useRef(null);
 
   // Acquire hold on mount
   useEffect(() => {
@@ -45,16 +66,26 @@ const Checkout = () => {
         return;
       }
       try {
-        const res = await api.post('/hotels/hold', {
-          hotelId,
-          roomId,
-          checkInDate: checkIn,
-          checkOutDate: checkOut,
-          roomsCount: parseInt(rooms) || 1,
-          guests: { adults: parseInt(guests) || 1, children: 0 },
-        });
-        setHoldData(res.data.hold);
-        const expiresAt = new Date(res.data.hold.expiresAt).getTime();
+        const [holdRes, hotelRes] = await Promise.all([
+          api.post('/hotels/hold', {
+            hotelId,
+            roomId,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            roomsCount: parseInt(rooms) || 1,
+            guests: { adults: parseInt(guests) || 1, children: 0 },
+          }),
+          api.get(`/hotels/${hotelId}`)
+        ]);
+        
+        setHoldData(holdRes.data.hold);
+        setHotelDetails(hotelRes.data.hotel);
+        if (hotelRes.data.hotel?.location) {
+          setDropAddress(hotelRes.data.hotel.location.address || 'Hotel Address');
+          setDropLocation(hotelRes.data.hotel.location);
+        }
+        
+        const expiresAt = new Date(holdRes.data.hold.expiresAt).getTime();
         const now = Date.now();
         setTimeLeft(Math.max(0, Math.floor((expiresAt - now) / 1000)));
       } catch (err) {
@@ -78,10 +109,75 @@ const Checkout = () => {
     return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
   };
 
+  const calculateCabFare = () => {
+    if (!pickupLocation || !dropLocation) return;
+    
+    const service = new window.google.maps.DistanceMatrixService();
+    service.getDistanceMatrix(
+      {
+        origins: [pickupLocation],
+        destinations: [dropLocation],
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      },
+      (response, status) => {
+        if (status === 'OK' && response.rows[0].elements[0].status === 'OK') {
+          const distanceMeters = response.rows[0].elements[0].distance.value;
+          const distanceKm = distanceMeters / 1000;
+          setCabDistance(distanceKm);
+          
+          // Basic Fare Calculation: 150 base + 15/km
+          const fare = 150 + (distanceKm * 15);
+          setCabPrice(Math.round(fare));
+        } else {
+          toast.error('Could not calculate distance. Please try a different location.');
+        }
+      }
+    );
+  };
+
+  const handlePlaceChanged = () => {
+    if (autocompleteRef.current !== null) {
+      const place = autocompleteRef.current.getPlace();
+      if (place.geometry && place.geometry.location) {
+        setPickupAddress(place.formatted_address || place.name);
+        setPickupLocation({
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+          address: place.formatted_address || place.name
+        });
+      }
+    }
+  };
+
+  const handleDropPlaceChanged = () => {
+    if (dropAutocompleteRef.current !== null) {
+      const place = dropAutocompleteRef.current.getPlace();
+      if (place.geometry && place.geometry.location) {
+        setDropAddress(place.formatted_address || place.name);
+        setDropLocation({
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+          address: place.formatted_address || place.name
+        });
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (pickupLocation && dropLocation) {
+      calculateCabFare();
+    }
+  }, [pickupLocation, dropLocation]);
+
   const handleConfirm = async () => {
     if (!guestDetails.fullName.trim()) { toast.error('Guest name is required'); return; }
     if (!guestDetails.mobile.trim()) { toast.error('Mobile number is required'); return; }
     if (!guestDetails.email.trim()) { toast.error('Email is required'); return; }
+
+    if (needPickupCab === 'yes' && !cabConfirmed) {
+      toast.error('Please confirm your cab booking details first.');
+      return;
+    }
 
     setConfirming(true);
     try {
@@ -91,8 +187,30 @@ const Checkout = () => {
         paymentMode,
         needPickupCab,
       });
+      
+      const hotelBookingId = res.data.booking._id;
+
+      // If cab is confirmed, automatically trigger cab booking
+      if (needPickupCab === 'yes' && cabConfirmed && pickupLocation) {
+        await api.post('/cabs/book', {
+          hotelBookingId,
+          hotelId,
+          cabSourcePreference: 'HOTEL_LINKED',
+          vehicleType: 'Sedan',
+          pickupLocation,
+          dropLocation,
+          pickupTime: new Date(checkIn + 'T' + guestDetails.expectedArrivalTime).toISOString(),
+          estimatedFare: cabPrice,
+          estimatedDistance: cabDistance,
+          tripType: 'pickup_to_hotel'
+        }).catch(err => {
+          console.error("Cab booking failed to trigger automatically:", err);
+          toast.warning("Hotel booked, but Cab request failed. Please request from dashboard.");
+        });
+      }
+
       toast.success('Booking confirmed successfully!');
-      navigate(`/hotel-booking/confirmation/${res.data.booking._id}`);
+      navigate(`/hotel-booking/confirmation/${hotelBookingId}`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to confirm booking.');
     } finally {
@@ -206,14 +324,89 @@ const Checkout = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Need pickup cab?</label>
-                  <div className="flex gap-4">
+                  <div className="flex gap-4 mb-4">
                     {['no', 'yes', 'later'].map((opt) => (
                       <label key={opt} className={`flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer transition ${needPickupCab === opt ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                        <input type="radio" name="pickupCab" value={opt} checked={needPickupCab === opt} onChange={() => setNeedPickupCab(opt)} className="sr-only" />
+                        <input type="radio" name="pickupCab" value={opt} checked={needPickupCab === opt} onChange={() => {
+                          setNeedPickupCab(opt);
+                          if (opt !== 'yes') setCabConfirmed(false);
+                        }} className="sr-only" />
                         {opt === 'no' ? 'No' : opt === 'yes' ? 'Yes' : 'Decide Later'}
                       </label>
                     ))}
                   </div>
+
+                  {needPickupCab === 'yes' && isLoaded && (
+                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl space-y-4">
+                      <h4 className="font-bold text-blue-900 flex items-center gap-2"><Navigation size={18} /> Schedule Cab Pickup</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-bold text-blue-800 mb-1 uppercase tracking-wider">Pickup Location</label>
+                          <Autocomplete
+                            onLoad={(autocomplete) => (autocompleteRef.current = autocomplete)}
+                            onPlaceChanged={handlePlaceChanged}
+                          >
+                            <div className="relative">
+                              <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+                              <input 
+                                type="text" 
+                                className="w-full pl-10 pr-3 py-3 border border-blue-200 rounded-xl focus:ring-2 focus:ring-primary/30 outline-none" 
+                                placeholder="Type pickup address and select..."
+                                onChange={(e) => {
+                                  if (cabConfirmed) setCabConfirmed(false);
+                                }}
+                              />
+                            </div>
+                          </Autocomplete>
+                          {!cabPrice && (
+                            <p className="text-[10px] text-blue-600 mt-1 ml-1 font-semibold">Please select from suggestions</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-blue-800 mb-1 uppercase tracking-wider">Drop Location (Hotel)</label>
+                          <Autocomplete
+                            onLoad={(autocomplete) => (dropAutocompleteRef.current = autocomplete)}
+                            onPlaceChanged={handleDropPlaceChanged}
+                          >
+                            <div className="relative">
+                              <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400" />
+                              <input 
+                                type="text" 
+                                value={dropAddress}
+                                onChange={(e) => {
+                                  setDropAddress(e.target.value);
+                                  if (cabConfirmed) setCabConfirmed(false);
+                                }}
+                                className="w-full pl-10 pr-3 py-3 border border-red-200 bg-red-50 focus:bg-white text-gray-800 rounded-xl focus:ring-2 focus:ring-red-400/30 outline-none" 
+                              />
+                            </div>
+                          </Autocomplete>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-lg border border-blue-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div className="flex-1 flex gap-8 w-full justify-start md:justify-around">
+                          <div>
+                            <p className="text-sm text-gray-500">Estimated Distance</p>
+                            <p className="font-bold text-lg">{cabDistance !== null ? `${cabDistance.toFixed(1)} km` : '--'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Estimated Fare</p>
+                            <p className="font-bold text-lg text-primary">{cabPrice !== null ? `₹${cabPrice}` : '--'}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCabConfirmed(true)}
+                          disabled={cabConfirmed || cabPrice === null}
+                          className={`px-6 py-3 md:py-2 rounded-xl font-bold transition w-full md:w-auto ${cabConfirmed ? 'bg-green-100 text-green-700 cursor-default' : (cabPrice === null ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary-dark shadow-md')}`}
+                        >
+                          {cabConfirmed ? '✓ Cab Confirmed' : 'Confirm Cab Booking'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -258,11 +451,19 @@ const Checkout = () => {
                 {holdData.priceSnapshot.discountAmount > 0 && (
                   <div className="flex justify-between text-green-600"><span>Discount</span><span>-₹{holdData.priceSnapshot.discountAmount.toLocaleString()}</span></div>
                 )}
+                {needPickupCab === 'yes' && cabConfirmed && cabPrice !== null && (
+                  <div className="flex justify-between text-blue-700 font-semibold bg-blue-50 -mx-2 px-2 py-1 rounded">
+                    <span>Cab Fare (Est.)</span>
+                    <span>₹{cabPrice.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between items-center mb-6">
                 <span className="text-lg font-bold text-gray-800">Total Payable</span>
-                <span className="text-2xl font-bold text-primary">₹{holdData.priceSnapshot.totalPrice.toLocaleString()}</span>
+                <span className="text-2xl font-bold text-primary">
+                  ₹{(holdData.priceSnapshot.totalPrice + (needPickupCab === 'yes' && cabConfirmed ? cabPrice : 0)).toLocaleString()}
+                </span>
               </div>
 
               {holdData.cancellationPolicy && (
@@ -278,7 +479,7 @@ const Checkout = () => {
                     : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                {confirming ? 'Processing...' : holdExpired ? 'Hold Expired — Go Back' : paymentMode === 'online' ? `Pay ₹${holdData.priceSnapshot.totalPrice.toLocaleString()} & Confirm` : 'Confirm Booking'}
+                {confirming ? 'Processing...' : holdExpired ? 'Hold Expired — Go Back' : paymentMode === 'online' ? `Pay ₹${(holdData.priceSnapshot.totalPrice + (needPickupCab === 'yes' && cabConfirmed ? cabPrice : 0)).toLocaleString()} & Confirm` : 'Confirm Booking'}
               </button>
             </div>
           </div>

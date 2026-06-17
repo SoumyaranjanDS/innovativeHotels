@@ -65,6 +65,46 @@ const CabLiveTracking = () => {
     return () => socket.disconnect();
   }, [bookingId]);
 
+  useEffect(() => {
+    if (!window.google || !booking?.cabBooking) return;
+    const calculateRoute = () => {
+      const directionsService = new window.google.maps.DirectionsService();
+      let origin, destination;
+
+      if (['assigned', 'on_the_way', 'arrived_at_pickup'].includes(status)) {
+        // Driver to Pickup (using a slight offset for demo if driverLocation is not yet live)
+        const dLoc = driverLocation || { 
+          lat: booking.cabBooking.pickupLocation.lat - 0.01, 
+          lng: booking.cabBooking.pickupLocation.lng - 0.01 
+        };
+        origin = dLoc;
+        destination = booking.cabBooking.pickupLocation;
+      } else if (['trip_started', 'completed'].includes(status)) {
+        // Pickup to Drop
+        origin = booking.cabBooking.pickupLocation;
+        destination = booking.cabBooking.dropLocation;
+      } else {
+        setDirections(null);
+        return;
+      }
+
+      directionsService.route(
+        {
+          origin,
+          destination,
+          travelMode: window.google.maps.TravelMode.DRIVING
+        },
+        (result, reqStatus) => {
+          if (reqStatus === window.google.maps.DirectionsStatus.OK) {
+            setDirections(result);
+          }
+        }
+      );
+    };
+
+    calculateRoute();
+  }, [booking, status, driverLocation]);
+
   if (!isLoaded) return <div>Loading map...</div>;
 
   return (
@@ -75,6 +115,12 @@ const CabLiveTracking = () => {
           <p className="text-sm font-medium text-primary uppercase tracking-widest">{status.replace(/_/g, ' ')}</p>
         </div>
         <div className="text-right">
+          {booking?.cabBooking?.otp && ['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup'].includes(status) && (
+            <div className="mb-2">
+              <p className="font-bold text-xs text-gray-500 uppercase tracking-wider">Your Ride OTP</p>
+              <p className="text-xl font-mono font-bold tracking-widest text-primary bg-primary/10 inline-block px-3 py-1 rounded">{booking.cabBooking.otp}</p>
+            </div>
+          )}
           <p className="font-bold">Payment Mode</p>
           <p className="text-sm text-gray-500">Cash on Delivery</p>
         </div>
@@ -102,7 +148,7 @@ const CabLiveTracking = () => {
               <p className="text-gray-500 max-w-sm mb-6">Your cab request has been sent to the hotel. They will manually assign a driver before your pickup time.</p>
               
               <button 
-                onClick={() => window.location.href = '/dashboard'}
+                onClick={() => window.location.href = '/my-bookings'}
                 className="w-full mt-4 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
               >
                 Go to My Bookings

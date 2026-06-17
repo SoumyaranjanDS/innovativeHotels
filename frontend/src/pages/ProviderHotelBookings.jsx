@@ -11,6 +11,8 @@ const ProviderHotelBookings = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
+  const [otpModalData, setOtpModalData] = useState(null);
+  const [otpInput, setOtpInput] = useState('');
 
   const fetchBookings = async () => {
       try {
@@ -31,15 +33,29 @@ const ProviderHotelBookings = () => {
     }
   }, [activeService]);
 
-  const handleStatusUpdate = async (id, status) => {
+  const handleStatusUpdate = async (id, status, otp = null) => {
     if (status === 'rejected' && !window.confirm('Are you sure you want to reject this booking? The room will be released.')) return;
     
+    if (status === 'completed' && !otp) {
+      setOtpModalData({ id, type: 'checkout' });
+      return;
+    }
+
+    if (status === 'checked_in' && !otp) {
+      setOtpModalData({ id, type: 'checkin' });
+      return;
+    }
+
     setActionLoading(id);
     try {
-      await api.patch(`/providers/hotel-bookings/${id}/status`, { status });
+      await api.patch(`/providers/hotel-bookings/${id}/status`, { status, otp });
       toast.success(`Booking ${status} successfully.`);
       fetchBookings();
       setShowDetailsModal(false);
+      if (otpModalData) {
+        setOtpModalData(null);
+        setOtpInput('');
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to update booking status.');
     } finally {
@@ -247,6 +263,42 @@ const ProviderHotelBookings = () => {
               )}
               <button onClick={() => setShowDetailsModal(false)} className="bg-gray-200 text-gray-800 px-6 py-2 rounded font-bold hover:bg-gray-300 transition">
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* OTP Verification Modal */}
+      {otpModalData && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${otpModalData.type === 'checkin' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Verify {otpModalData.type === 'checkin' ? 'Check-In' : 'Check-Out'}</h2>
+            <p className="text-gray-500 mb-6 text-sm">Ask the guest for the 6-digit {otpModalData.type === 'checkin' ? 'Check-in' : 'Check-out'} OTP shown on their dashboard.</p>
+            <input 
+              type="text" 
+              value={otpInput}
+              onChange={(e) => setOtpInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+              placeholder="000000"
+              className="w-full text-center text-4xl tracking-widest font-mono border-b-2 border-gray-300 focus:border-primary outline-none py-2 mb-8"
+            />
+            <div className="flex gap-4">
+              <button 
+                onClick={() => { setOtpModalData(null); setOtpInput(''); }} 
+                className="flex-1 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => handleStatusUpdate(otpModalData.id, otpModalData.type === 'checkin' ? 'checked_in' : 'completed', otpInput)} 
+                disabled={otpInput.length !== 6 || actionLoading === otpModalData.id}
+                className={`flex-1 py-3 text-white font-bold rounded-xl transition disabled:opacity-50 ${otpModalData.type === 'checkin' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+              >
+                Verify
               </button>
             </div>
           </div>

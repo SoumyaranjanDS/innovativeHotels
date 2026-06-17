@@ -198,12 +198,6 @@ const CustomerHotelBookingDetail = () => {
                 )}
               </div>
             </div>
-
-            {/* Cab Section */}
-            {(hb?.needPickupCab === 'yes' || hb?.needPickupCab === 'later' || hb?.status === 'confirmed') && (
-              <CabSuggestionBox hotelBookingId={booking._id} hotelAddress={`${booking.hotelAddress}, ${booking.hotelCity}`} />
-            )}
-
           </div>
 
           {/* Sidebar */}

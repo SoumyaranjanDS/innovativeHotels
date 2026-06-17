@@ -354,6 +354,10 @@ exports.updateHotelBookingStatus = async (req, res) => {
     
     const currentStatus = booking.hotelBooking.status;
 
+    if (currentStatus === status) {
+      return res.status(200).json({ success: true, message: `Booking is already ${status}.` });
+    }
+
     if (!['pending_approval', 'confirmed', 'checked_in'].includes(currentStatus)) {
       return res.status(400).json({ success: false, message: `Cannot update booking from ${currentStatus} state.` });
     }
@@ -381,6 +385,11 @@ exports.updateHotelBookingStatus = async (req, res) => {
       }
     } else if (status === 'checked_in') {
       if (currentStatus !== 'confirmed') return res.status(400).json({ success: false, message: 'Booking must be confirmed before checking in' });
+      
+      if (booking.hotelBooking.otp && booking.hotelBooking.otp !== req.body.otp) {
+        return res.status(400).json({ success: false, message: 'Invalid Check-in OTP. Please verify with the customer.' });
+      }
+
       booking.hotelBooking.status = 'checked_in';
       
       // Auto-complete any pickup cabs that are still active
@@ -406,7 +415,21 @@ exports.updateHotelBookingStatus = async (req, res) => {
       
     } else if (status === 'completed') {
       if (currentStatus !== 'checked_in') return res.status(400).json({ success: false, message: 'Booking must be checked in before completing' });
+      
+      if (booking.hotelBooking.checkoutOtp && booking.hotelBooking.checkoutOtp !== req.body.otp) {
+        return res.status(400).json({ success: false, message: 'Invalid Check-out OTP. Please verify with the customer.' });
+      }
+
       booking.hotelBooking.status = 'completed';
+      
+      // Forcefully release inventory immediately regardless of booked dates
+      const HotelAvailability = require('../models/HotelAvailability');
+      for (const date of booking.hotelBooking.dates) {
+        await HotelAvailability.updateOne(
+          { hotelId: booking.hotelBooking.hotelId, roomId: booking.hotelBooking.roomId, date },
+          { $inc: { bookedRooms: -booking.hotelBooking.roomsCount } }
+        );
+      }
       
       // Auto-complete any remaining associated cabs (just in case they were left hanging)
       const activeCabs = await Booking.find({
@@ -432,6 +455,15 @@ exports.updateHotelBookingStatus = async (req, res) => {
     }
 
     await booking.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${booking.userId.toString()}`).emit('hotel_status_changed', {
+        bookingId: booking._id,
+        status: booking.hotelBooking.status
+      });
+    }
+
     res.status(200).json({ success: true, message: `Booking ${status} successfully.`, data: booking });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

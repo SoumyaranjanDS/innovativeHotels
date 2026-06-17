@@ -287,25 +287,37 @@ exports.holdRoom = async (req, res) => {
       const dates = getStayDates(checkInDate, checkOutDate);
       if (dates.length === 0) throw new Error('Invalid date range');
 
+      // PRE-INITIALIZE AVAILABILITY DOCUMENTS OUTSIDE THE TRANSACTION
+      // Doing upserts inside a multi-document transaction causes frequent WriteConflicts.
+      for (const date of dates) {
+        try {
+          await HotelAvailability.updateOne(
+            { hotelId, roomId, date },
+            { 
+              $setOnInsert: {
+                totalRooms: room.totalRooms,
+                bookedRooms: 0,
+                heldRooms: 0,
+                basePrice: room.price,
+                finalPrice: room.price,
+                isBlocked: false
+              }
+            },
+            { upsert: true } // No session!
+          );
+        } catch (e) {
+          // Ignore duplicate key errors if two users try to hold the same room at the exact same ms
+          if (e.code !== 11000) throw e;
+        }
+      }
+
       let totalBasePrice = 0;
 
       for (const date of dates) {
-        // Use findOneAndUpdate with upsert to avoid duplicate key errors during high concurrency
-        let availability = await HotelAvailability.findOneAndUpdate(
-          { hotelId, roomId, date },
-          { 
-            $setOnInsert: {
-              totalRooms: room.totalRooms,
-              bookedRooms: 0,
-              heldRooms: 0,
-              basePrice: room.price,
-              finalPrice: room.price,
-              isBlocked: false
-            }
-          },
-          { upsert: true, new: true, session }
-        );
+        // Now inside the transaction, the document is guaranteed to exist.
+        const availability = await HotelAvailability.findOne({ hotelId, roomId, date }).session(session);
 
+        if (!availability) throw new Error('Failed to retrieve availability.');
         if (availability.isBlocked) throw new Error(`Room blocked for ${date.toLocaleDateString()}`);
 
         const availableCount = availability.totalRooms - availability.bookedRooms - availability.heldRooms;
@@ -382,7 +394,8 @@ exports.holdRoom = async (req, res) => {
 
       if (
         (error.hasErrorLabel && error.hasErrorLabel('TransientTransactionError')) || 
-        (error.message && error.message.toLowerCase().includes('write conflict'))
+        (error.message && error.message.toLowerCase().includes('write conflict')) ||
+        (error.message && error.message.toLowerCase().includes('writeconflict'))
       ) {
         if (attempt === maxRetries) {
           return res.status(500).json({ success: false, message: 'Server is currently busy. Please try again.' });

@@ -5,6 +5,49 @@ import api from '../api/axios';
 import { toast } from 'react-toastify';
 import { MapPin, Star, ShieldCheck, Users, BedDouble, Wind, ChevronLeft, ChevronRight, Clock, AlertCircle } from 'lucide-react';
 
+const RoomPhotoSlider = ({ photos, altText }) => {
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    if (!photos || photos.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % photos.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [photos]);
+
+  if (!photos || photos.length === 0) {
+    return <img src="https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=400&q=80" alt={altText} className="w-full h-full object-cover" />;
+  }
+
+  return (
+    <div className="relative w-full h-full group overflow-hidden">
+      <img src={photos[current]} alt={altText} className="w-full h-full object-cover transition-opacity duration-500" />
+      {photos.length > 1 && (
+        <>
+          <button 
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCurrent((prev) => (prev > 0 ? prev - 1 : photos.length - 1)); }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/70 hover:bg-white backdrop-blur rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow"
+          >
+            <ChevronLeft size={16} className="text-gray-800" />
+          </button>
+          <button 
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCurrent((prev) => (prev < photos.length - 1 ? prev + 1 : 0)); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/70 hover:bg-white backdrop-blur rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow"
+          >
+            <ChevronRight size={16} className="text-gray-800" />
+          </button>
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+            {photos.map((_, i) => (
+              <div key={i} className={`w-1.5 h-1.5 rounded-full ${i === current ? 'bg-white' : 'bg-white/50'}`} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const HotelDetailPage = () => {
   const { hotelId } = useParams();
   const [searchParams] = useSearchParams();
@@ -206,7 +249,7 @@ const HotelDetailPage = () => {
                       <div className="flex flex-col md:flex-row">
                         {/* Room Image */}
                         <div className="md:w-56 h-44 md:h-auto flex-shrink-0">
-                          <img src={room.roomPhotos?.[0] || 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=400&q=80'} alt={room.roomType} className="w-full h-full object-cover" />
+                          <RoomPhotoSlider photos={room.roomPhotos} altText={room.roomType} />
                         </div>
 
                         {/* Room Details */}

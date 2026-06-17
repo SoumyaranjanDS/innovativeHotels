@@ -21,6 +21,7 @@ const ProviderHotelRooms = () => {
   const [isEditingRoom, setIsEditingRoom] = useState(false);
   const [editRoomForm, setEditRoomForm] = useState(null);
   const [editRoomUploading, setEditRoomUploading] = useState(false);
+  const [editRoomFiles, setEditRoomFiles] = useState([]);
 
   const fetchRooms = async () => {
     try {
@@ -116,23 +117,78 @@ const ProviderHotelRooms = () => {
 
   const handleUpdateRoom = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+
+    const validNewFiles = editRoomFiles.filter(file => file !== null && file !== undefined);
+    const existingCount = editRoomForm.roomPhotos ? editRoomForm.roomPhotos.length : 0;
+    
+    if (existingCount + validNewFiles.length < 3 || existingCount + validNewFiles.length > 7) {
+      toast.error('A room must have between 3 and 7 photos.');
+      return;
+    }
+
     setEditRoomUploading(true);
     try {
-      await api.put(`/providers/rooms/${selectedRoom._id}`, {
+      let finalPhotos = [...(editRoomForm.roomPhotos || [])];
+
+      if (validNewFiles.length > 0) {
+        const formData = new FormData();
+        validNewFiles.forEach(file => {
+          formData.append('files', file);
+        });
+
+        const uploadRes = await api.post('/upload/multiple', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        finalPhotos = [...finalPhotos, ...uploadRes.data.urls];
+      }
+
+      const res = await api.put(`/providers/rooms/${selectedRoom._id}`, {
         roomType: editRoomForm.roomType,
         occupancy: editRoomForm.occupancy,
         price: editRoomForm.price,
-        totalRooms: editRoomForm.totalRooms
+        totalRooms: editRoomForm.totalRooms,
+        roomPhotos: finalPhotos
       });
       toast.success("Room updated successfully");
       fetchRooms();
-      setSelectedRoom(prev => ({ ...prev, ...editRoomForm }));
+      setSelectedRoom(res.data.room);
       setIsEditingRoom(false);
+      setEditRoomFiles([]);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to update room');
     } finally {
       setEditRoomUploading(false);
     }
+  };
+
+  const removeExistingPhoto = (index) => {
+    const updatedForm = { ...editRoomForm };
+    if (updatedForm.roomPhotos) {
+      updatedForm.roomPhotos = updatedForm.roomPhotos.filter((_, i) => i !== index);
+      setEditRoomForm(updatedForm);
+    }
+  };
+
+  const handleEditRoomFileChange = (e, index) => {
+    const file = e.target.files[0];
+    if (file) {
+      const newFiles = [...editRoomFiles];
+      newFiles[index] = file;
+      setEditRoomFiles(newFiles);
+    }
+  };
+
+  const addEditRoomFileInput = () => {
+    const existingCount = editRoomForm.roomPhotos ? editRoomForm.roomPhotos.length : 0;
+    if (existingCount + editRoomFiles.length < 7) {
+      setEditRoomFiles([...editRoomFiles, null]);
+    }
+  };
+
+  const removeEditRoomFileInput = (index) => {
+    const newFiles = [...editRoomFiles];
+    newFiles.splice(index, 1);
+    setEditRoomFiles(newFiles);
   };
 
   if (activeService !== 'hotel') {
@@ -257,7 +313,7 @@ const ProviderHotelRooms = () => {
               <h2 className="text-xl font-bold text-gray-800">
                 {isEditingRoom ? `Edit Room: ${selectedRoom.roomType}` : `Room Details: ${selectedRoom.roomType}`}
               </h2>
-              <button onClick={() => { setShowRoomDetails(false); setIsEditingRoom(false); }} className="text-gray-500 hover:text-gray-800">
+              <button onClick={() => { setShowRoomDetails(false); setIsEditingRoom(false); setEditRoomFiles([]); }} className="text-gray-500 hover:text-gray-800">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
             </div>
@@ -283,8 +339,32 @@ const ProviderHotelRooms = () => {
                       <input type="number" min="1" required value={editRoomForm.totalRooms} onChange={e => setEditRoomForm({...editRoomForm, totalRooms: Number(e.target.value)})} className="w-full p-2 border border-gray-300 rounded focus:ring-accent focus:border-accent" />
                     </div>
                   </div>
-                  {/* Photo editing is not supported in edit mode for simplicity, user can delete and recreate room if photos need to change entirely */}
-                  <p className="text-xs text-gray-500 italic mt-4">Note: To change room photos, please delete this room and create a new one.</p>
+                  
+                  <div className="mt-4 border-t pt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Manage Room Photos</label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+                      {editRoomForm.roomPhotos?.map((photo, i) => (
+                        <div key={i} className="relative group">
+                          <img src={photo} alt={`Room ${i+1}`} className="w-full h-24 object-cover rounded border" />
+                          <button type="button" onClick={() => removeExistingPhoto(i)} className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow">X</button>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {editRoomFiles.map((file, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input type="file" accept="image/*" onChange={e => handleEditRoomFileChange(e, index)} className="flex-1 p-1.5 border border-gray-300 rounded focus:ring-accent focus:border-accent text-sm" />
+                          <button type="button" onClick={() => removeEditRoomFileInput(index)} className="text-red-500 font-bold px-2 py-1 hover:bg-red-50 rounded">X</button>
+                        </div>
+                      ))}
+                      {(editRoomForm.roomPhotos?.length || 0) + editRoomFiles.length < 7 && (
+                        <button type="button" onClick={addEditRoomFileInput} className="text-sm bg-gray-200 text-gray-800 px-3 py-1.5 rounded hover:bg-gray-300 transition mt-2 block">
+                          + Add Photo ({(editRoomForm.roomPhotos?.length || 0) + editRoomFiles.length}/7)
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -296,10 +376,10 @@ const ProviderHotelRooms = () => {
                   </div>
                   
                   <div>
-                    <p className="font-semibold text-gray-500 text-sm mb-2">Room Photos ({selectedRoom.photos?.length || 0}):</p>
-                    {selectedRoom.photos?.length > 0 ? (
+                    <p className="font-semibold text-gray-500 text-sm mb-2">Room Photos ({selectedRoom.roomPhotos?.length || 0}):</p>
+                    {selectedRoom.roomPhotos?.length > 0 ? (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {selectedRoom.photos.map((photo, i) => (
+                        {selectedRoom.roomPhotos.map((photo, i) => (
                           <img key={i} src={photo} alt={`Room ${i+1}`} className="w-full h-24 object-cover rounded border" />
                         ))}
                       </div>
@@ -326,7 +406,7 @@ const ProviderHotelRooms = () => {
                   <button type="button" onClick={() => handleDeleteRoom(selectedRoom._id)} className="bg-red-100 text-red-700 px-6 py-2 rounded font-bold hover:bg-red-200 transition">
                     Delete Room
                   </button>
-                  <button type="button" onClick={() => { setEditRoomForm({ ...selectedRoom }); setIsEditingRoom(true); }} className="bg-yellow-100 text-yellow-700 px-6 py-2 rounded font-bold hover:bg-yellow-200 transition">
+                  <button type="button" onClick={() => { setEditRoomForm({ ...selectedRoom }); setEditRoomFiles([]); setIsEditingRoom(true); }} className="bg-yellow-100 text-yellow-700 px-6 py-2 rounded font-bold hover:bg-yellow-200 transition">
                     Edit Room
                   </button>
                   <button type="button" onClick={() => setShowRoomDetails(false)} className="bg-gray-200 text-gray-800 px-8 py-2 rounded font-bold hover:bg-gray-300 transition shadow-md">

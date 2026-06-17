@@ -12,6 +12,7 @@ router.use(protect);
 router.use(authorize('Provider'));
 
 router.post('/onboard', onboardHotelCab);
+router.get('/all-available-cabs', require('../controllers/hotel-cab.controller').getAllAvailableCabs);
 router.get('/', getHotelCabs);
 router.get('/bookings', getHotelCabBookings);
 router.patch('/bookings/:id/assign', require('../controllers/hotel-cab.controller').assignCabBooking);

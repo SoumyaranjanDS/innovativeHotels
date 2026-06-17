@@ -13,6 +13,8 @@ const ProviderDashboard = () => {
   const [hotelCabs, setHotelCabs] = useState([]);
   const [hotelCabBookings, setHotelCabBookings] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [allPlatformCabs, setAllPlatformCabs] = useState([]);
+  const [allPlatformVehicles, setAllPlatformVehicles] = useState([]);
   const [fareRules, setFareRules] = useState([]);
   const [metrics, setMetrics] = useState({ totalRevenue: '0.00', activeBookings: 0, pendingRequests: 0 });
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,15 @@ const ProviderDashboard = () => {
         }
       } catch (e) {
         console.log("No hotel cabs yet");
+      }
+
+      // Fetch all available drivers in the platform for assignment
+      try {
+        const allCabsRes = await api.get('/hotel-cabs/all-available-cabs');
+        if (allCabsRes.data.cabs) setAllPlatformCabs(allCabsRes.data.cabs);
+        if (allCabsRes.data.vehicles) setAllPlatformVehicles(allCabsRes.data.vehicles);
+      } catch (e) {
+        console.log("Failed to fetch all platform cabs");
       }
 
       // Fetch hotel cab bookings
@@ -655,7 +666,7 @@ const ProviderDashboard = () => {
                   })}
                 </select>
                 {hotelCabs.filter(c => c.status === 'approved' && c.availability?.isAvailable !== false).length === 0 && (
-                  <p className="text-red-500 text-xs mt-2">No available approved drivers found. Add more cabs or wait for drivers to finish trips.</p>
+                  <p className="text-red-500 text-xs mt-2">No available approved drivers found for your hotel. Add more cabs or wait for drivers to finish trips.</p>
                 )}
               </div>
 

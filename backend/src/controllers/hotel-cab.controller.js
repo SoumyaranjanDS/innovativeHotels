@@ -438,3 +438,21 @@ exports.updateCabStatus = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.getAllAvailableCabs = async (req, res, next) => {
+  try {
+    const CabVendor = require('../models/CabVendor');
+    const Vehicle = require('../models/Vehicle');
+    const cabs = await CabVendor.find({ status: 'approved' });
+    const cabVendorIds = cabs.map(c => c._id);
+    const vehicles = await Vehicle.find({ vendorId: { $in: cabVendorIds } });
+    
+    res.status(200).json({
+      success: true,
+      cabs,
+      vehicles
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

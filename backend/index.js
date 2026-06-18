@@ -70,6 +70,10 @@ app.use('/api/admin', require('./src/routes/admin.routes'));
 app.use('/api/upload', require('./src/routes/upload.routes'));
 app.use('/api/support', require('./src/routes/support.routes'));
 
+app.get('/', (req, res) => {
+    res.send('Hotel & Cab API is running');
+});
+
 // Hold Expiry Cron Job - runs every minute
 cron.schedule('* * * * *', async () => {
   try {

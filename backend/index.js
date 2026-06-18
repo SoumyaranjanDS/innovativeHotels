@@ -14,11 +14,29 @@ const server = http.createServer(app);
 // Dynamic Origins Setup
 const allowedOrigins = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',') 
-  : ['http://localhost:5173'];
+  : [];
+
+const originCheck = (origin, callback) => {
+  // Allow requests with no origin (like mobile apps or curl requests)
+  if (!origin) return callback(null, true);
+  
+  // Allow any local network IP dynamically (localhost, 127.0.0.1, 192.168.x.x)
+  const isLocal = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$/.test(origin);
+  if (isLocal) {
+    return callback(null, true);
+  }
+
+  // Check against explicitly allowed URLs (like production)
+  if (allowedOrigins.includes(origin)) {
+    return callback(null, true);
+  }
+
+  return callback(new Error('Not allowed by CORS'));
+};
 
 // Setup Socket.io
 const io = new Server(server, {
-  cors: { origin: allowedOrigins, credentials: true }
+  cors: { origin: originCheck, credentials: true }
 });
 app.set('io', io); // make accessible in controllers
 require('./src/sockets/location.socket')(io);
@@ -28,7 +46,7 @@ require('./src/sockets/support.socket')(io);
 app.use(express.json());
 
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: originCheck,
   credentials: true,
 };
 app.use(cors(corsOptions));

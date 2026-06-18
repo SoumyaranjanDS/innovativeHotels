@@ -40,7 +40,7 @@ const CabBooking = () => {
           api.get('/cabs/agencies')
         ]);
         if (hRes.data?.data) setHotels(hRes.data.data);
-        if (aRes.data?.data) setAgencies(aRes.data.data);
+        if (aRes.data?.agencies) setAgencies(aRes.data.agencies);
       } catch (err) {
         console.error('Failed to load providers');
       }
@@ -185,7 +185,7 @@ const CabBooking = () => {
                 >
                   <option value="">-- Choose Agency --</option>
                   {agencies.map(a => (
-                    <option key={a._id} value={a._id}>{a.businessName}</option>
+                    <option key={a._id} value={a._id}>{a.businessName || a.name}</option>
                   ))}
                 </select>
               </div>

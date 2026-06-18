@@ -80,7 +80,10 @@ exports.getActiveRide = async (req, res) => {
     }
 
     const activeRide = await Booking.findOne({
-      'cabBooking.assignedCabProviderId': vendorId,
+      $or: [
+        { 'cabBooking.assignedCabProviderId': vendorId },
+        { 'cabBooking.vendorId': vendorId }
+      ],
       'cabBooking.status': { $in: ['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'] }
     }).populate('userId', 'name email mobile');
 

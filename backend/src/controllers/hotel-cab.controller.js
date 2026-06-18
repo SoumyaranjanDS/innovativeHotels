@@ -163,8 +163,17 @@ exports.getHotelCabBookings = async (req, res, next) => {
 
        cabBookings = await Booking.find({
           bookingType: 'CAB',
-          'cabBooking.cabSourceType': { $in: ['INDEPENDENT', 'AGENCY'] },
-          'cabBooking.assignedCabProviderId': req.user.id
+          $or: [
+            {
+              'cabBooking.cabSourceType': { $in: ['INDEPENDENT', 'AGENCY'] },
+              'cabBooking.assignedCabProviderId': req.user.id
+            },
+            {
+              'cabBooking.cabSourceType': 'INDEPENDENT',
+              'cabBooking.status': { $in: ['requested', 'external_cabs_notified'] },
+              'cabBooking.assignedCabProviderId': { $exists: false }
+            }
+          ]
        })
        .populate('userId', 'name email mobile')
        .populate('cabBooking.vendorId')
@@ -368,7 +377,7 @@ exports.assignCabBooking = async (req, res, next) => {
 
     booking.cabBooking.status = 'assigned';
     booking.cabBooking.vendorId = vendorId;
-    booking.cabBooking.assignedCabProviderId = vendorId;
+    booking.cabBooking.assignedCabProviderId = req.user.id;
     booking.cabBooking.vehicleId = vehicleId;
     booking.cabBooking.acceptedAt = new Date();
     if (!booking.cabBooking.otp) {
@@ -418,16 +427,29 @@ exports.verifyCabOTP = async (req, res, next) => {
     const { id } = req.params;
     const { otp } = req.body;
 
-    const hotel = await Hotel.findOne({ providerId: req.user.id });
-    if (!hotel) return res.status(404).json({ success: false, message: 'Hotel not found' });
+    const User = require('../models/User');
+    const user = await User.findById(req.user.id);
+    let isCabAgency = user?.providerType === 'Cab';
 
-    const booking = await Booking.findOne({
-      _id: id,
-      bookingType: 'CAB',
-      'cabBooking.hotelId': hotel._id,
-    });
+    let booking;
+    if (isCabAgency) {
+      booking = await Booking.findOne({
+        _id: id,
+        bookingType: 'CAB',
+        'cabBooking.assignedCabProviderId': req.user.id,
+      });
+    } else {
+      const hotel = await Hotel.findOne({ providerId: req.user.id });
+      if (!hotel) return res.status(404).json({ success: false, message: 'Hotel not found' });
 
-    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+      booking = await Booking.findOne({
+        _id: id,
+        bookingType: 'CAB',
+        'cabBooking.hotelId': hotel._id,
+      });
+    }
+
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found or unauthorized' });
 
     if (booking.cabBooking.otp !== otp) {
       return res.status(400).json({ success: false, message: 'Invalid OTP' });
@@ -453,16 +475,29 @@ exports.updateCabStatus = async (req, res, next) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const hotel = await Hotel.findOne({ providerId: req.user.id });
-    if (!hotel) return res.status(404).json({ success: false, message: 'Hotel not found' });
+    const User = require('../models/User');
+    const user = await User.findById(req.user.id);
+    let isCabAgency = user?.providerType === 'Cab';
 
-    const booking = await Booking.findOne({
-      _id: id,
-      bookingType: 'CAB',
-      'cabBooking.hotelId': hotel._id,
-    });
+    let booking;
+    if (isCabAgency) {
+      booking = await Booking.findOne({
+        _id: id,
+        bookingType: 'CAB',
+        'cabBooking.assignedCabProviderId': req.user.id,
+      });
+    } else {
+      const hotel = await Hotel.findOne({ providerId: req.user.id });
+      if (!hotel) return res.status(404).json({ success: false, message: 'Hotel not found' });
 
-    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+      booking = await Booking.findOne({
+        _id: id,
+        bookingType: 'CAB',
+        'cabBooking.hotelId': hotel._id,
+      });
+    }
+
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found or unauthorized' });
 
     booking.cabBooking.status = status;
     booking.cabBooking.statusLogs.push({

@@ -1,31 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700;800&family=Dancing+Script:wght@500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  /* Brand Colors — matched to logo */
-  --color-primary: #1B2E5C;
-  --color-primary-light: #2A4074;
-  --color-primary-dark: #0f1b3d;
-  --color-accent: #C8A84E;
-  --color-accent-light: #ddc06e;
-  --color-accent-dark: #a88a36;
-  --color-background: #FAFBFD;
+  /* Brand Colors — matched to Light Sage Theme */
+  --color-primary: #FAF9F5;
+  --color-primary-light: #FFFFFF;
+  --color-primary-dark: #F3F1EB;
+  --color-accent: #8A9A74;
+  --color-accent-light: #A4B38E;
+  --color-accent-dark: #6C7A58;
+  --color-background: #FAF9F5;
 
   /* Font families */
   --font-heading: 'Playfair Display', serif;
+  --font-script: 'Dancing Script', cursive;
   --font-body: 'Inter', sans-serif;
 }
 
 @layer base {
   body {
     background-color: var(--color-background);
-    color: var(--color-gray-900);
+    color: #2C2C2C;
     font-family: var(--font-body);
   }
 
   h1, h2, h3 {
     font-family: var(--font-heading);
   }
+}
+
+@utility bg-gold-gradient {
+  background: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+}
+
+@utility text-gold-gradient {
+  background: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Reusable Animations */

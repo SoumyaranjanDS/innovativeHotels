@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -8,6 +9,7 @@ const Login = () => {
     email: '',
     password: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const { login } = useContext(AuthContext);
 
@@ -36,62 +38,99 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="bg-white p-8 md:p-10 rounded-2xl shadow-xl max-w-md w-full border border-gray-100">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <Link to="/">
-            <img src="/inno-logo.jpeg" alt="Innovative Hotel Solution" className="h-16 object-contain mb-3" />
-          </Link>
-          <p className="text-xs text-accent font-semibold tracking-[0.2em] uppercase">Stay Comfortable, Stay Special</p>
-        </div>
+    <div className="min-h-screen bg-[#24352B] flex overflow-hidden font-body selection:bg-[#70A99A] selection:text-white relative">
+      
+      {/* Decorative Background Bubbles */}
+      <div className="absolute top-10 right-20 w-64 h-64 bg-[#70A99A]/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-10 right-1/4 w-48 h-48 bg-[#70A99A]/10 rounded-full blur-3xl pointer-events-none"></div>
 
-        <h2 className="text-3xl font-heading font-bold text-primary mb-6 text-center">Welcome Back</h2>
+      {/* Left Side: Image with elliptical mask */}
+      <div className="hidden lg:block lg:w-1/2 relative h-screen z-10">
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: "url('/images/hero1.png')",
+            clipPath: "ellipse(110% 100% at 0% 50%)"
+          }}
+        />
+        <div className="absolute inset-0 bg-[#24352B]/40" style={{ clipPath: "ellipse(110% 100% at 0% 50%)" }} />
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email or Mobile</label>
-            <input
-              type="text"
-              name="email"
-              required
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition"
-              placeholder="john@example.com or 9876543210"
-            />
+      {/* Right Side: Form */}
+      <div className="w-full lg:w-1/2 h-screen overflow-y-auto custom-scrollbar flex flex-col items-center justify-start p-6 sm:p-12 relative z-20">
+        <div className="w-full max-w-md my-auto py-8">
+          
+          <div className="flex flex-col mb-10">
+            <Link to="/">
+              <img src="/inno-logo.jpeg" alt="Innovative Hotel Solution" className="h-16 object-contain mb-4 rounded-xl" />
+            </Link>
+            <p className="text-xs text-[#70A99A] font-semibold tracking-[0.2em] uppercase">
+              Stay Comfortable, Stay Special
+            </p>
           </div>
 
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium text-gray-700">Password</label>
-              <a href="#" className="text-xs text-accent hover:underline">Forgot password?</a>
-            </div>
-            <input
-              type="password"
-              name="password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition"
-              placeholder="••••••••"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary-light transition mt-4 shadow-md"
-          >
+          <h2 className="text-4xl font-semibold text-white mb-10">
             Login
-          </button>
-        </form>
+          </h2>
 
-        <p className="text-center text-gray-500 mt-6 text-sm">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-primary font-medium hover:underline">
-            Register here
-          </Link>
-        </p>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm text-white/90 mb-2">
+                Username or Email
+              </label>
+              <input
+                type="text"
+                name="email"
+                required
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-6 py-4 bg-[#304739] rounded-full text-white placeholder-white/40 outline-none focus:ring-2 focus:ring-[#70A99A]/50 transition-all border-none"
+                placeholder="Enter your username"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-white/90 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full pl-6 pr-14 py-4 bg-[#304739] rounded-full text-white placeholder-white/40 outline-none focus:ring-2 focus:ring-[#70A99A]/50 transition-all border-none"
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-4">
+              <button
+                type="submit"
+                className="w-full bg-[#70A99A] text-white py-4 rounded-full font-semibold hover:bg-[#5E9485] transition-all shadow-lg active:scale-[0.98]"
+              >
+                Login to Account
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-8 text-sm text-white/70">
+            Don't have an account?{' '}
+            <Link to="/register" className="text-[#70A99A] font-medium hover:text-white transition-colors underline decoration-[#70A99A]">
+              Register Now
+            </Link>
+          </div>
+
+        </div>
       </div>
     </div>
   );

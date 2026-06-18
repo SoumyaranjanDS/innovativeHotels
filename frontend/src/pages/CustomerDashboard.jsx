@@ -310,55 +310,63 @@ const CustomerDashboard = () => {
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Car size={18} className="text-indigo-500" /> Independent Cab Rides</h2>
                 <div className="space-y-4">
                   {cabBookings.filter(b => !b.cabBooking?.hotelBookingId).map((b) => (
-                    <div key={b._id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-bold">CAB</span>
-                          <span className="text-sm text-gray-500">{new Date(b.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <p className="font-bold text-gray-900">{b.bookingId}</p>
-                        {b.cabBooking && (
-                          <div className="text-sm text-gray-600 mt-1">
-                            <p>Pickup: {b.cabBooking.pickupLocation?.address || 'N/A'}</p>
-                            <p>Drop: {b.cabBooking.dropLocation?.address || 'N/A'}</p>
+                    <div key={b._id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-bold">CAB</span>
+                            <span className="text-sm text-gray-500">{new Date(b.createdAt).toLocaleDateString()}</span>
                           </div>
-                        )}
-                      </div>
-                      <div className="text-right flex flex-col items-end gap-2">
-                        <p className="text-xl font-bold text-gray-900">₹{b.totalAmount}</p>
-                        <div className="flex gap-4 items-center">
-                          {b.cabBooking?.otp && (
-                            <div className="text-right">
-                              <p className="text-[10px] uppercase font-bold text-gray-400">Ride OTP</p>
-                              <p className="text-sm font-mono font-bold tracking-widest text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{b.cabBooking.otp}</p>
+                          <p className="font-bold text-gray-900">{b.bookingId}</p>
+                          {b.cabBooking && (
+                            <div className="text-sm text-gray-600 mt-1">
+                              <p>Pickup: {b.cabBooking.pickupLocation?.address || 'N/A'}</p>
+                              <p>Drop: {b.cabBooking.dropLocation?.address || 'N/A'}</p>
                             </div>
                           )}
-                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${b.cabBooking?.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {b.cabBooking?.status?.replace(/_/g, ' ').toUpperCase()}
-                          </span>
                         </div>
-                        {/* Live Tracking Map for Active Independent Cab */}
-                        {['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(b.cabBooking?.status) && (
-                          <div className="w-full mt-2">
-                            <MiniTrackingMap cab={b} isLoaded={isLoaded} driverLocations={driverLocations} />
-                          </div>
-                        )}
-                        {!['completed', 'cancelled', 'rejected'].includes(b.cabBooking?.status) && (
-                          <div className="mt-2 flex gap-2">
-                            <Link to={`/cab-tracking/${b._id}`} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition text-center flex-1">
-                              Track Ride
-                            </Link>
-                            {!['trip_started'].includes(b.cabBooking?.status) && (
-                              <button 
-                                onClick={() => handleCancelCabRide(b._id)}
-                                className="px-4 py-2 border-2 border-red-100 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 transition flex-1"
-                              >
-                                Cancel
-                              </button>
+                        <div className="text-left md:text-right flex flex-col items-start md:items-end gap-2">
+                          <p className="text-xl font-bold text-gray-900">₹{b.totalAmount}</p>
+                          <div className="flex gap-4 items-center">
+                            {b.cabBooking?.otp && (
+                              <div className="text-left md:text-right">
+                                <p className="text-[10px] uppercase font-bold text-gray-400">Ride OTP</p>
+                                <p className="text-sm font-mono font-bold tracking-widest text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{b.cabBooking.otp}</p>
+                              </div>
                             )}
+                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${b.cabBooking?.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {b.cabBooking?.status?.replace(/_/g, ' ').toUpperCase()}
+                            </span>
                           </div>
-                        )}
+                          {!['completed', 'cancelled', 'rejected'].includes(b.cabBooking?.status) && (
+                            <div className="mt-2 flex gap-2 w-full md:w-auto">
+                              <Link to={`/cab-tracking/${b._id}`} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition text-center flex-1 md:flex-none">
+                                Track Ride
+                              </Link>
+                              {!['trip_started'].includes(b.cabBooking?.status) && (
+                                <button 
+                                  onClick={() => handleCancelCabRide(b._id)}
+                                  className="px-4 py-2 border-2 border-red-100 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 transition flex-1 md:flex-none"
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      
+                      {/* Live Tracking Map & Stepper for Active Independent Cab */}
+                      {b.cabBooking && (
+                        <div className="w-full mt-2 pt-4 border-t border-gray-100">
+                          <CabRideStepper status={b.cabBooking.status} />
+                          {['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(b.cabBooking.status) && (
+                            <div className="mt-4">
+                              <MiniTrackingMap cab={b} isLoaded={isLoaded} driverLocations={driverLocations} />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -585,6 +593,64 @@ const MiniTrackingMap = ({ cab, isLoaded, driverLocations }) => {
   );
 };
 
+const CabRideStepper = ({ status }) => {
+  const steps = [
+    { id: 'requested', label: 'Requested', match: ['requested', 'notified_drivers', 'external_cabs_notified', 'hotel_cabs_notified', 'accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started', 'completed'] },
+    { id: 'assigned', label: 'Assigned', match: ['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started', 'completed'] },
+    { id: 'arrived', label: 'Reached', match: ['arrived_at_pickup', 'trip_started', 'completed'] },
+    { id: 'started', label: 'Picked Up', match: ['trip_started', 'completed'] },
+    { id: 'completed', label: 'Complete', match: ['completed'] }
+  ];
+
+  if (['cancelled', 'rejected'].includes(status)) {
+    return (
+      <div className="w-full bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center font-bold mt-2">
+        Ride {status.charAt(0).toUpperCase() + status.slice(1)}
+      </div>
+    );
+  }
+
+  // Calculate progress percentage
+  const currentIndex = [...steps].reverse().findIndex(s => s.match.includes(status));
+  const activeIndex = currentIndex === -1 ? 0 : steps.length - 1 - currentIndex;
+  const progress = (activeIndex / (steps.length - 1)) * 100;
+
+  return (
+    <div className="w-full py-4 mt-2">
+      <div className="flex items-center justify-between relative px-2 sm:px-4">
+        <div className="absolute left-2 sm:left-4 right-2 sm:right-4 top-4 h-1 bg-gray-200 rounded-full"></div>
+        <div 
+          className="absolute left-2 sm:left-4 top-4 h-1 bg-indigo-600 rounded-full transition-all duration-500 ease-in-out"
+          style={{ width: `calc(${progress}% - 32px)` }}
+        ></div>
+        
+        {steps.map((step, index) => {
+          const isCompleted = step.match.includes(status);
+          const isCurrent = index === activeIndex;
+          
+          return (
+            <div key={step.id} className="relative z-10 flex flex-col items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-4 transition-colors duration-300 ${isCompleted ? 'bg-indigo-600 border-indigo-200 text-white' : 'bg-white border-gray-200'}`}>
+                {isCompleted ? (
+                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                   </svg>
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-gray-300"></span>
+                )}
+              </div>
+              <span className={`text-[10px] sm:text-xs font-bold absolute top-10 whitespace-nowrap ${isCurrent ? 'text-indigo-600' : isCompleted ? 'text-gray-800' : 'text-gray-400'}`}>
+                {step.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="h-6"></div>
+    </div>
+  );
+};
+
 const BookingCard = ({ booking, getStatusColor, formatStatus, showActions, showReview, onReviewClick, associatedCabs = [], isLoaded, driverLocations }) => {
   const hb = booking.hotelBooking;
   const nights = hb?.dates?.length || 0;
@@ -730,10 +796,15 @@ const BookingCard = ({ booking, getStatusColor, formatStatus, showActions, showR
                           </span>
                         </div>
                       </div>
-                      {/* Live Tracking Map for Active Linked Cab */}
-                      {['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(cab.cabBooking?.status) && (
-                        <MiniTrackingMap cab={cab} isLoaded={isLoaded} driverLocations={driverLocations} />
-                      )}
+                      {/* Live Tracking Map and Stepper for Active Linked Cab */}
+                      <div className="w-full mt-2">
+                        <CabRideStepper status={cab.cabBooking?.status} />
+                        {['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(cab.cabBooking?.status) && (
+                          <div className="mt-4">
+                            <MiniTrackingMap cab={cab} isLoaded={isLoaded} driverLocations={driverLocations} />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

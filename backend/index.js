@@ -11,9 +11,14 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
+// Dynamic Origins Setup
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.split(',') 
+  : ['http://localhost:5173'];
+
 // Setup Socket.io
 const io = new Server(server, {
-  cors: { origin: true, credentials: true }
+  cors: { origin: allowedOrigins, credentials: true }
 });
 app.set('io', io); // make accessible in controllers
 require('./src/sockets/location.socket')(io);
@@ -23,7 +28,7 @@ require('./src/sockets/support.socket')(io);
 app.use(express.json());
 
 const corsOptions = {
-  origin: ['https://bangalorerapid.online', 'http://localhost:5173'],
+  origin: allowedOrigins,
   credentials: true,
 };
 app.use(cors(corsOptions));

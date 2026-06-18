@@ -37,7 +37,7 @@ const bookingSchema = new mongoose.Schema(
       },
       needPickupCab: {
         type: String,
-        enum: ["yes", "no", "later"],
+        enum: ["yes", "no", "later", "hotel", "external"],
         default: "no",
       },
       otp: String,
@@ -77,7 +77,10 @@ const bookingSchema = new mongoose.Schema(
 
     // Cab Specific
     cabBooking: {
-      assignedCabProviderId: { type: mongoose.Schema.Types.ObjectId, ref: "CabVendor" },
+      assignedCabProviderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "CabVendor",
+      },
       vendorId: { type: mongoose.Schema.Types.ObjectId, ref: "CabVendor" },
       vehicleId: { type: mongoose.Schema.Types.ObjectId, ref: "Vehicle" },
       cabSourcePreference: {
@@ -85,7 +88,10 @@ const bookingSchema = new mongoose.Schema(
         enum: ["HOTEL_LINKED", "EXTERNAL", "ANY"],
         default: "ANY",
       },
-      cabSourceType: { type: String, enum: ["HOTEL_LINKED", "INDEPENDENT"] },
+      cabSourceType: {
+        type: String,
+        enum: ["HOTEL_LINKED", "INDEPENDENT", "AGENCY"],
+      },
       hotelBookingId: { type: mongoose.Schema.Types.ObjectId, ref: "Booking" },
       hotelId: { type: mongoose.Schema.Types.ObjectId, ref: "Hotel" },
       pickupLocation: {
@@ -130,6 +136,7 @@ const bookingSchema = new mongoose.Schema(
         type: String,
         enum: [
           "requested",
+          "awaiting_hotel_approval",
           "notified_drivers",
           "external_cabs_notified",
           "hotel_cabs_notified",

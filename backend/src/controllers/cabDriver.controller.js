@@ -22,11 +22,21 @@ exports.updateLocation = async (req, res) => {
 
 exports.getRideRequests = async (req, res) => {
   try {
-    const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
-    if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+    // Collect ALL possible IDs this user might be identified by in RideNotification
+    const possibleIds = [req.user.id]; // Always include the User._id
+    
+    // Also check if user has a CabVendor record
+    const vendors = await CabVendor.find({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
+    for (const v of vendors) {
+      possibleIds.push(v._id);
+    }
+
+    // Convert to ObjectIds for consistent comparison
+    const mongoose = require('mongoose');
+    const objectIds = possibleIds.map(id => new mongoose.Types.ObjectId(id));
 
     const notifications = await RideNotification.find({
-      cabProviderId: vendor._id,
+      cabProviderId: { $in: objectIds },
       status: 'sent'
     }).populate({
       path: 'bookingId',
@@ -34,22 +44,45 @@ exports.getRideRequests = async (req, res) => {
     });
 
     // Filter out notifications where booking is no longer pending
-    const validRequests = notifications.filter(n => n.bookingId !== null).map(n => n.bookingId);
+    const validRequests = notifications.filter(n => n.bookingId !== null).map(n => {
+      const b = n.bookingId;
+      return {
+        bookingId: b._id,
+        pickupLocation: b.cabBooking?.pickupLocation,
+        dropLocation: b.cabBooking?.dropLocation,
+        estimatedFare: b.totalAmount,
+        distanceKm: b.cabBooking?.distanceKm,
+        durationMinutes: b.cabBooking?.durationMinutes
+      };
+    });
+    console.log(`[getRideRequests] userId=${req.user.id}, possibleIds=${objectIds}, found ${validRequests.length} requests`);
     res.json({ success: true, requests: validRequests });
   } catch (err) {
+    console.error('[getRideRequests] Error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
 exports.getActiveRide = async (req, res) => {
   try {
+    let vendorId = null;
     const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
-    if (!vendor) return res.status(404).json({ success: false, message: 'Vendor not found' });
+    if (vendor) {
+      vendorId = vendor._id;
+    } else {
+      const User = require('../models/User');
+      const user = await User.findById(req.user.id);
+      if (user && user.role === 'Provider' && user.providerType === 'Cab') {
+        vendorId = user._id;
+      } else {
+        return res.status(404).json({ success: false, message: 'Vendor not found' });
+      }
+    }
 
     const activeRide = await Booking.findOne({
-      'cabBooking.assignedCabProviderId': vendor._id,
+      'cabBooking.assignedCabProviderId': vendorId,
       'cabBooking.status': { $in: ['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'] }
-    });
+    }).populate('userId', 'name email mobile');
 
     res.json({ success: true, activeRide });
   } catch (err) {
@@ -64,24 +97,37 @@ exports.acceptRide = async (req, res) => {
     const providerId = req.user.id;
 
     // 1. Verify Driver Eligibility
-    const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }], isApproved: true });
-    if (!vendor) return res.status(403).json({ success: false, message: 'Driver not approved or found' });
+    let vendorId = null;
+    let isAgency = false;
+    let vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }], isApproved: true });
     
-    if (!vendor.availability.isAvailable) {
-      return res.status(400).json({ success: false, message: 'You are currently busy with another ride' });
+    if (vendor) {
+      vendorId = vendor._id;
+      if (!vendor.availability.isAvailable) {
+        return res.status(400).json({ success: false, message: 'You are currently busy with another ride' });
+      }
+    } else {
+      const User = require('../models/User');
+      const user = await User.findById(req.user.id);
+      if (user && user.role === 'Provider' && user.providerType === 'Cab') {
+        vendorId = user._id;
+        isAgency = true;
+      } else {
+        return res.status(403).json({ success: false, message: 'Driver not approved or found' });
+      }
     }
 
     // 2. Atomic Update on Booking
     const booking = await Booking.findOneAndUpdate(
       {
         _id: bookingId,
-        'cabBooking.status': { $in: ['requested', 'notified_drivers'] } // Only if still pending
+        'cabBooking.status': { $in: ['requested', 'notified_drivers', 'external_cabs_notified', 'hotel_cabs_notified'] } // Only if still pending
       },
       {
         $set: {
           'cabBooking.status': 'accepted',
-          'cabBooking.vendorId': vendor._id,
-          'cabBooking.assignedCabProviderId': vendor._id,
+          'cabBooking.vendorId': vendorId,
+          'cabBooking.assignedCabProviderId': vendorId,
           'cabBooking.acceptedAt': new Date()
         }
       },
@@ -97,9 +143,11 @@ exports.acceptRide = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Ride no longer available or already accepted.' });
     }
 
-    // 3. Mark Driver as Busy
-    vendor.availability.isAvailable = false;
-    await vendor.save();
+    // 3. Mark Driver as Busy (if not an agency)
+    if (!isAgency && vendor) {
+      vendor.availability.isAvailable = false;
+      await vendor.save();
+    }
 
     // 4. Update Notification Record
     await RideNotification.findOneAndUpdate(
@@ -112,7 +160,7 @@ exports.acceptRide = async (req, res) => {
     if (io) {
       io.to(`user_${booking.userId.toString()}`).emit('ride_accepted', {
         bookingId: booking._id,
-        driverInfo: vendor.vendorDetails
+        driverInfo: vendor ? vendor.vendorDetails : { fleetCompanyName: "External Agency", mobile: "N/A" }
       });
     }
 
@@ -131,8 +179,16 @@ exports.updateRideStatus = async (req, res) => {
     const { status, lat, lng } = req.body;
     const providerId = req.user.id;
 
+    let vendorId = null;
+    let isAgency = false;
     const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
-    const booking = await Booking.findOne({ _id: bookingId, 'cabBooking.vendorId': vendor._id });
+    if (vendor) {
+      vendorId = vendor._id;
+    } else {
+      vendorId = req.user.id;
+      isAgency = true;
+    }
+    const booking = await Booking.findOne({ _id: bookingId, 'cabBooking.vendorId': vendorId });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
@@ -152,8 +208,10 @@ exports.updateRideStatus = async (req, res) => {
       booking.codCollectedAt = new Date();
 
       // Free up driver
-      vendor.availability.isAvailable = true;
-      await vendor.save();
+      if (!isAgency && vendor) {
+        vendor.availability.isAvailable = true;
+        await vendor.save();
+      }
 
       // Generate Platform Fee from fareSnapshot
       const platformFeeAmount = booking.cabBooking.fareSnapshot?.platformFee || ((booking.totalAmount * 10) / 100);
@@ -161,10 +219,10 @@ exports.updateRideStatus = async (req, res) => {
       
       await PlatformFee.create({
         bookingId: booking._id,
-        providerId: vendor.providerId,
-        cabProviderId: vendor._id,
-        driverId: vendor.driverId,
-        hotelId: vendor.hotelId,
+        providerId: vendor ? vendor.providerId : vendorId,
+        cabProviderId: vendorId,
+        driverId: vendor ? vendor.driverId : vendorId,
+        hotelId: vendor ? vendor.hotelId : null,
         grossFare: booking.totalAmount,
         platformFee: platformFeeAmount,
         driverEarning: driverEarningAmount,
@@ -195,8 +253,14 @@ exports.verifyOTP = async (req, res) => {
     const { bookingId } = req.params;
     const { otp, lat, lng } = req.body;
 
+    let vendorId = null;
     const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
-    const booking = await Booking.findOne({ _id: bookingId, 'cabBooking.vendorId': vendor._id });
+    if (vendor) {
+      vendorId = vendor._id;
+    } else {
+      vendorId = req.user.id;
+    }
+    const booking = await Booking.findOne({ _id: bookingId, 'cabBooking.vendorId': vendorId });
 
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
     

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
-import { MapPin, Calendar, Star, ChevronRight, Hotel, Car, Clock, X, Download, AlertCircle } from 'lucide-react';
-import { useLoadScript, GoogleMap, DirectionsRenderer, Marker } from '@react-google-maps/api';
+import { MapPin, Calendar, Star, ChevronRight, Hotel, Car, Clock, X, Download, AlertCircle, LogOut, User as UserIcon, Users, BedDouble } from 'lucide-react';
+import { useLoadScript, GoogleMap, DirectionsRenderer, Marker, Autocomplete } from '@react-google-maps/api';
 import { io } from 'socket.io-client';
 import ReviewForm from '../components/booking/ReviewForm';
+import { useAuth } from '../context/AuthContext';
+import Home from './Home';
+import CabBooking from './CabBooking';
 
 const libraries = ['places'];
 
@@ -17,6 +20,20 @@ const CustomerDashboard = () => {
   const [socket, setSocket] = useState(null);
   const [driverLocations, setDriverLocations] = useState({});
   const [reviewModalData, setReviewModalData] = useState(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [dashboardSubTab, setDashboardSubTab] = useState('hotel');
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Hotel search state
+  const [hotelSearch, setHotelSearch] = useState({
+    destination: '',
+    checkIn: '',
+    checkOut: '',
+    guests: 1,
+    rooms: 1,
+  });
+  const autocompleteRef = React.useRef(null);
 
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
@@ -67,6 +84,55 @@ const CustomerDashboard = () => {
     return () => newSocket.close();
   }, []);
 
+  const handlePlaceChanged = () => {
+    if (autocompleteRef.current !== null) {
+      const place = autocompleteRef.current.getPlace();
+      if (place && place.formatted_address) {
+        let city = place.name || place.formatted_address;
+        setHotelSearch({ ...hotelSearch, destination: city });
+      }
+    }
+  };
+
+  const handleHotelSearch = () => {
+    if (!hotelSearch.destination.trim()) {
+      toast.error('Please enter a destination');
+      return;
+    }
+    if (!hotelSearch.checkIn) {
+      toast.error('Please select a check-in date');
+      return;
+    }
+    if (!hotelSearch.checkOut) {
+      toast.error('Please select a check-out date');
+      return;
+    }
+    if (new Date(hotelSearch.checkOut) <= new Date(hotelSearch.checkIn)) {
+      toast.error('Check-out date must be after check-in date');
+      return;
+    }
+
+    const params = new URLSearchParams({
+      city: hotelSearch.destination,
+      checkIn: hotelSearch.checkIn,
+      checkOut: hotelSearch.checkOut,
+      guests: hotelSearch.guests,
+      rooms: hotelSearch.rooms,
+    });
+    navigate(`/hotels?${params.toString()}`);
+  };
+
+  const handleCancelCabRide = async (bookingId) => {
+    if (!window.confirm("Are you sure you want to cancel this cab ride?")) return;
+    try {
+      await api.post(`/cabs/${bookingId}/cancel`);
+      toast.success("Cab ride cancelled successfully");
+      fetchBookings(); // Refresh the list
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to cancel ride");
+    }
+  };
+
   const getStatusColor = (status) => {
     const colors = {
       confirmed: 'bg-green-100 text-green-700',
@@ -98,11 +164,71 @@ const CustomerDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background pt-24 pb-8 px-4 sm:px-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-heading font-bold text-gray-900 mb-8">My Trips & Bookings</h1>
+      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
+        
+        {/* Sidebar */}
+        <div className="w-full lg:w-72 shrink-0">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 lg:p-6 sticky top-24 z-30 flex flex-row lg:flex-col overflow-x-auto gap-2 lg:gap-4 lg:h-[calc(100vh-8rem)] hide-scrollbar">
+            <h2 className="font-bold text-xl mb-4 text-gray-900 hidden lg:block">Customer Panel</h2>
+            <nav className="flex flex-row lg:flex-col gap-2 min-w-max lg:min-w-0 flex-1">
+              <button 
+                onClick={() => { setActiveTab('dashboard'); setDashboardSubTab('hotel'); }}
+                className={`text-left px-4 py-3 rounded-xl font-medium flex items-center gap-3 transition whitespace-nowrap ${activeTab === 'dashboard' && dashboardSubTab === 'hotel' ? 'bg-primary/10 text-primary' : 'text-gray-700 hover:bg-gray-50 hover:text-primary'}`}
+              >
+                <Hotel size={18} /> My Hotel Bookings
+              </button>
+              <button 
+                onClick={() => { setActiveTab('dashboard'); setDashboardSubTab('cab'); }}
+                className={`text-left px-4 py-3 rounded-xl font-medium flex items-center gap-3 transition whitespace-nowrap ${activeTab === 'dashboard' && dashboardSubTab === 'cab' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600'}`}
+              >
+                <Car size={18} /> My Cab Rides
+              </button>
 
-        <div className="space-y-10">
-            {/* Upcoming */}
+              <div className="hidden lg:block my-2 border-t border-gray-100"></div>
+
+              <button 
+                onClick={() => setActiveTab('book_hotel')}
+                className={`text-left px-4 py-3 rounded-xl font-medium flex items-center gap-3 transition whitespace-nowrap ${activeTab === 'book_hotel' ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-50 hover:text-primary'}`}
+              >
+                <Hotel size={18} /> Book Hotel
+              </button>
+              <button 
+                onClick={() => setActiveTab('book_cab')}
+                className={`text-left px-4 py-3 rounded-xl font-medium flex items-center gap-3 transition whitespace-nowrap ${activeTab === 'book_cab' ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-50 hover:text-primary'}`}
+              >
+                <Car size={18} /> Book Cab
+              </button>
+              <button 
+                onClick={() => setActiveTab('profile')}
+                className={`text-left px-4 py-3 rounded-xl font-medium flex items-center gap-3 transition whitespace-nowrap ${activeTab === 'profile' ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-50 hover:text-primary'}`}
+              >
+                <UserIcon size={18} /> Update Profile
+              </button>
+            </nav>
+
+            <div className="lg:mt-auto lg:border-t lg:border-gray-100 lg:pt-4 flex items-center">
+              <button 
+                onClick={logout}
+                className="w-full text-left px-4 py-3 rounded-xl font-medium flex items-center gap-3 text-red-600 hover:bg-red-50 transition whitespace-nowrap"
+              >
+                <LogOut size={18} /> Logout
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 w-full overflow-hidden">
+          {activeTab === 'dashboard' && (
+            <div>
+              <div className="mb-8">
+                <h1 className="text-3xl font-heading font-bold text-gray-900 mb-2">My Bookings</h1>
+                <p className="text-gray-500">Manage your hotel stays and cab rides</p>
+              </div>
+
+              <div className="space-y-10">
+                {dashboardSubTab === 'hotel' && (
+                  <>
             {upcoming.length > 0 && (
               <div>
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><Calendar size={18} className="text-primary" /> Upcoming ({upcoming.length})</h2>
@@ -135,6 +261,7 @@ const CustomerDashboard = () => {
                       getStatusColor={getStatusColor} 
                       formatStatus={formatStatus} 
                       showReview 
+                      onReviewClick={() => setReviewModalData(b._id)}
                       associatedCabs={cabBookings.filter(cab => cab.cabBooking?.hotelBookingId === b._id)}
                       isLoaded={isLoaded}
                       driverLocations={driverLocations}
@@ -171,6 +298,11 @@ const CustomerDashboard = () => {
                 <Link to="/" className="text-primary font-semibold hover:underline">Book Your First Stay →</Link>
               </div>
             )}
+            </>
+          )}
+
+          {dashboardSubTab === 'cab' && (
+            <>
 
             {/* Standalone Cab Bookings */}
             {cabBookings.filter(b => !b.cabBooking?.hotelBookingId).length > 0 && (
@@ -212,10 +344,18 @@ const CustomerDashboard = () => {
                           </div>
                         )}
                         {!['completed', 'cancelled', 'rejected'].includes(b.cabBooking?.status) && (
-                          <div className="mt-2">
-                            <Link to={`/cab-tracking/${b._id}`} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">
+                          <div className="mt-2 flex gap-2">
+                            <Link to={`/cab-tracking/${b._id}`} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition text-center flex-1">
                               Track Ride
                             </Link>
+                            {!['trip_started'].includes(b.cabBooking?.status) && (
+                              <button 
+                                onClick={() => handleCancelCabRide(b._id)}
+                                className="px-4 py-2 border-2 border-red-100 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 transition flex-1"
+                              >
+                                Cancel
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -224,7 +364,114 @@ const CustomerDashboard = () => {
                 </div>
               </div>
             )}
+            </>
+          )}
           </div>
+        </div>
+      )}
+
+      {activeTab === 'book_hotel' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 min-h-[60vh]">
+          <div className="flex justify-between items-center mb-8 border-b border-gray-100 pb-4">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3"><Hotel className="text-primary"/> Search Hotels</h2>
+            <button onClick={() => setActiveTab('dashboard')} className="px-4 py-2 bg-gray-100 rounded-lg text-sm font-semibold hover:bg-gray-200 transition flex items-center gap-2"><ChevronRight className="rotate-180" size={16}/> Back</button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-2 relative">
+              <label className="block text-sm font-bold text-gray-700 mb-2">Where to?</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                {isLoaded ? (
+                  <Autocomplete onLoad={ref => autocompleteRef.current = ref} onPlaceChanged={handlePlaceChanged}>
+                    <input type="text" placeholder="City or Hotel Name" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none" onChange={(e) => setHotelSearch({...hotelSearch, destination: e.target.value})} />
+                  </Autocomplete>
+                ) : (
+                  <input type="text" placeholder="Loading..." disabled className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl" />
+                )}
+              </div>
+            </div>
+
+            <div className="relative">
+              <label className="block text-sm font-bold text-gray-700 mb-2">Check-in</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input type="date" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none" min={new Date().toISOString().split('T')[0]} value={hotelSearch.checkIn} onChange={(e) => setHotelSearch({...hotelSearch, checkIn: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="relative">
+              <label className="block text-sm font-bold text-gray-700 mb-2">Check-out</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input type="date" className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none" min={hotelSearch.checkIn || new Date().toISOString().split('T')[0]} value={hotelSearch.checkOut} onChange={(e) => setHotelSearch({...hotelSearch, checkOut: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="relative flex gap-2">
+              <div className="flex-1">
+                <label className="block text-sm font-bold text-gray-700 mb-2">Guests</label>
+                <div className="relative">
+                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  <input type="number" min="1" className="w-full pl-10 pr-2 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none" value={hotelSearch.guests} onChange={(e) => setHotelSearch({...hotelSearch, guests: parseInt(e.target.value) || 1})} />
+                </div>
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-bold text-gray-700 mb-2">Rooms</label>
+                <div className="relative">
+                  <BedDouble className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  <input type="number" min="1" className="w-full pl-10 pr-2 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none" value={hotelSearch.rooms} onChange={(e) => setHotelSearch({...hotelSearch, rooms: parseInt(e.target.value) || 1})} />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-8">
+            <button onClick={handleHotelSearch} className="w-full py-4 bg-primary text-white rounded-xl font-bold text-lg hover:bg-primary-light transition shadow-lg shadow-primary/30 flex justify-center items-center gap-2">
+              Search Hotels
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'book_cab' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative min-h-[80vh]">
+          <button onClick={() => setActiveTab('dashboard')} className="absolute top-6 left-6 z-50 bg-white/90 backdrop-blur px-4 py-2 rounded-lg shadow border border-gray-200 font-bold text-gray-700 hover:text-primary transition flex items-center gap-2">
+            <ChevronRight className="rotate-180" size={16}/> Back to Dashboard
+          </button>
+          <div className="-mt-12 pointer-events-auto">
+            <CabBooking isEmbedded={true} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'profile' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 min-h-[60vh]">
+          <div className="flex justify-between items-center mb-8 border-b border-gray-100 pb-4">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3"><UserIcon className="text-primary"/> Update Profile</h2>
+            <button onClick={() => setActiveTab('dashboard')} className="px-4 py-2 bg-gray-100 rounded-lg text-sm font-semibold hover:bg-gray-200 transition">Back</button>
+          </div>
+          <div className="max-w-md">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input type="text" defaultValue={user?.name} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" defaultValue={user?.email} disabled className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                <input type="tel" defaultValue={user?.mobile} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none" />
+              </div>
+              <button className="px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-light transition w-full mt-4" onClick={() => toast.success("Profile updated successfully")}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+        </div>
       </div>
 
       <AnimatePresence>
@@ -338,7 +585,7 @@ const MiniTrackingMap = ({ cab, isLoaded, driverLocations }) => {
   );
 };
 
-const BookingCard = ({ booking, getStatusColor, formatStatus, showActions, showReview, associatedCabs = [], isLoaded, driverLocations }) => {
+const BookingCard = ({ booking, getStatusColor, formatStatus, showActions, showReview, onReviewClick, associatedCabs = [], isLoaded, driverLocations }) => {
   const hb = booking.hotelBooking;
   const nights = hb?.dates?.length || 0;
 
@@ -368,7 +615,7 @@ const BookingCard = ({ booking, getStatusColor, formatStatus, showActions, showR
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
         <div className="flex flex-col md:flex-row">
           {/* Image */}
-          <div className="md:w-48 h-36 md:h-auto flex-shrink-0">
+          <div className="md:w-48 h-36 md:h-auto shrink-0">
             <img src={booking.hotelPhotos?.[0] || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=300&q=80'} alt={booking.hotelName} className="w-full h-full object-cover" />
           </div>
 
@@ -429,9 +676,12 @@ const BookingCard = ({ booking, getStatusColor, formatStatus, showActions, showR
                   </Link>
                 )}
                 {showReview && (
-                  <Link to={`/hotel-booking/${booking._id}`} className="px-4 py-2 bg-accent/10 text-accent rounded-lg text-sm font-semibold hover:bg-accent/20 transition">
+                  <button 
+                    onClick={() => onReviewClick && onReviewClick()} 
+                    className="px-4 py-2 bg-accent/10 text-accent rounded-lg text-sm font-semibold hover:bg-accent/20 transition"
+                  >
                     Review
-                  </Link>
+                  </button>
                 )}
                 {hb?.status !== 'pending_approval' && (
                   <Link to={`/hotel-booking/${booking._id}`} className="px-4 py-2 text-gray-600 hover:text-primary text-sm font-semibold flex items-center gap-1 transition">

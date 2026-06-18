@@ -365,6 +365,19 @@ exports.updateHotelBookingStatus = async (req, res) => {
     if (status === 'confirmed') {
       if (currentStatus !== 'pending_approval') return res.status(400).json({ success: false, message: 'Invalid state transition to confirmed' });
       booking.hotelBooking.status = 'confirmed';
+
+      // Check for cab bookings waiting for this hotel approval
+      const cabBookings = await Booking.find({
+        bookingType: 'CAB',
+        'cabBooking.hotelBookingId': booking._id,
+        'cabBooking.status': 'awaiting_hotel_approval'
+      });
+      if (cabBookings.length > 0) {
+        const cabBookingController = require('./cabBooking.controller');
+        for (const cab of cabBookings) {
+          await cabBookingController.broadcastCabRequest(cab._id, req.app.get('io'));
+        }
+      }
     } else if (status === 'rejected') {
       if (currentStatus !== 'pending_approval') return res.status(400).json({ success: false, message: 'Invalid state transition to rejected' });
       booking.hotelBooking.status = 'rejected';

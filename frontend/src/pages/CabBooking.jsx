@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
 
@@ -12,14 +12,49 @@ const CabBooking = () => {
     libraries,
   });
 
-  const [pickup, setPickup] = useState(null);
-  const [drop, setDrop] = useState(null);
+  const location = useLocation();
+  const initialState = location.state || {};
+
+  const [pickup, setPickup] = useState(initialState.pickup || null);
+  const [drop, setDrop] = useState(initialState.drop || null);
+  const [vehicleType, setVehicleType] = useState(initialState.vehicleType || 'Mini');
+  const [cabSourcePreference, setCabSourcePreference] = useState(initialState.cabSourcePreference || 'ANY');
+  const [selectedHotelId, setSelectedHotelId] = useState('');
+  const [selectedAgencyId, setSelectedAgencyId] = useState('');
+  
   const [fareEstimate, setFareEstimate] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [hotels, setHotels] = useState([]);
+  const [agencies, setAgencies] = useState([]);
 
   const pickupRef = useRef();
   const dropRef = useRef();
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    // Fetch available providers
+    const fetchProviders = async () => {
+      try {
+        const [hRes, aRes] = await Promise.all([
+          api.get('/hotels/search'),
+          api.get('/cabs/agencies')
+        ]);
+        if (hRes.data?.data) setHotels(hRes.data.data);
+        if (aRes.data?.data) setAgencies(aRes.data.data);
+      } catch (err) {
+        console.error('Failed to load providers');
+      }
+    };
+    fetchProviders();
+
+    // If we navigated here from Home with prefilled state, calculate fare automatically
+    if (initialState.pickup && initialState.drop && isLoaded) {
+      // Small timeout to let UI mount
+      setTimeout(() => {
+        getEstimate(initialState.pickup, initialState.drop, initialState.vehicleType);
+      }, 500);
+    }
+  }, [isLoaded]); // run once when maps is loaded
 
   const handlePlaceChanged = (ref, setLocation) => {
     const place = ref.current.getPlace();
@@ -33,11 +68,11 @@ const CabBooking = () => {
     }
   };
 
-  const getEstimate = async () => {
-    if (!pickup || !drop) return toast.error("Please select both pickup and drop locations from the dropdown");
+  const getEstimate = async (p = pickup, d = drop, vt = vehicleType) => {
+    if (!p || !d) return toast.error("Please select both pickup and drop locations from the dropdown");
     setLoading(true);
     try {
-      const res = await api.post('/cabs/fare-estimate', { pickupLocation: pickup, dropLocation: drop, vehicleType: 'Mini' });
+      const res = await api.post('/cabs/fare-estimate', { pickupLocation: p, dropLocation: d, vehicleType: vt });
       setFareEstimate(res.data.data);
     } catch (err) {
       toast.error("Failed to calculate fare");
@@ -49,18 +84,25 @@ const CabBooking = () => {
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      const res = await api.post('/cabs/book', {
+      const payload = {
         pickupLocation: pickup,
         dropLocation: drop,
         pickupDateTime: new Date(),
         tripType: 'local',
         passengers: 1,
-        vehicleType: 'Mini'
-      });
+        vehicleType: vehicleType,
+        cabSourcePreference: cabSourcePreference
+      };
+
+      if (cabSourcePreference === 'EXTERNAL' && selectedAgencyId) {
+        payload.assignedCabProviderId = selectedAgencyId;
+      }
+
+      const res = await api.post('/cabs/book', payload);
       toast.success("Booking Requested!");
       navigate(`/cab-tracking/${res.data.booking._id}`);
     } catch (err) {
-      toast.error("Booking failed");
+      toast.error(err.response?.data?.message || "Booking failed");
     } finally {
       setLoading(false);
     }
@@ -83,6 +125,7 @@ const CabBooking = () => {
               >
                 <input 
                   type="text" 
+                  defaultValue={pickup?.address || ''}
                   placeholder="Enter pickup location"
                   className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                 />
@@ -97,15 +140,60 @@ const CabBooking = () => {
               >
                 <input 
                   type="text" 
+                  defaultValue={drop?.address || ''}
                   placeholder="Enter drop location"
                   className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                 />
               </Autocomplete>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Type</label>
+              <select 
+                value={vehicleType} 
+                onChange={(e) => setVehicleType(e.target.value)}
+                className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none bg-white"
+              >
+                <option value="Mini">Mini Cab</option>
+                <option value="Sedan">Sedan</option>
+                <option value="SUV">SUV</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cab Source Option</label>
+              <select 
+                value={cabSourcePreference} 
+                onChange={(e) => {
+                  setCabSourcePreference(e.target.value);
+                  setSelectedHotelId('');
+                  setSelectedAgencyId('');
+                }}
+                className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none bg-white"
+              >
+                <option value="ANY">Any Cab</option>
+                <option value="EXTERNAL">External Cab Agency</option>
+              </select>
+            </div>
+
+
+            {cabSourcePreference === 'EXTERNAL' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Agency</label>
+                <select 
+                  value={selectedAgencyId} 
+                  onChange={(e) => setSelectedAgencyId(e.target.value)}
+                  className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none bg-white"
+                >
+                  <option value="">-- Choose Agency --</option>
+                  {agencies.map(a => (
+                    <option key={a._id} value={a._id}>{a.businessName}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <button 
-            onClick={getEstimate}
+            onClick={() => getEstimate(pickup, drop, vehicleType)}
             disabled={loading}
             className="w-full py-4 bg-primary text-white rounded-xl font-semibold hover:bg-primary-light transition"
           >

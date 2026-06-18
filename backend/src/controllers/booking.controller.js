@@ -3,6 +3,7 @@ const Booking = require('../models/Booking');
 exports.getMyBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({ userId: req.user.id })
+      .populate('cabBooking.vendorId')
       .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, count: bookings.length, data: bookings });
@@ -13,7 +14,9 @@ exports.getMyBookings = async (req, res) => {
 
 exports.getBookingById = async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id)
+      .populate('cabBooking.vendorId')
+      .populate('cabBooking.vehicleId');
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }

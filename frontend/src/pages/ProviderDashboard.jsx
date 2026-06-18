@@ -369,7 +369,7 @@ const ProviderDashboard = () => {
                 </div>
               </div>
 
-              {hotelCabBookings.filter(b => b.cabBooking?.status === 'requested').length === 0 ? (
+              {hotelCabBookings.filter(b => ['requested', 'external_cabs_notified', 'hotel_cabs_notified'].includes(b.cabBooking?.status)).length === 0 ? (
                 <div className="bg-gray-50 rounded-xl p-8 text-center border border-gray-200">
                   <p className="text-gray-500">No pending cab requests at the moment.</p>
                 </div>
@@ -386,7 +386,7 @@ const ProviderDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {hotelCabBookings.filter(b => b.cabBooking?.status === 'requested').map(booking => (
+                      {hotelCabBookings.filter(b => ['requested', 'external_cabs_notified', 'hotel_cabs_notified'].includes(b.cabBooking?.status)).map(booking => (
                         <tr key={booking._id}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="font-semibold text-gray-800">{booking.userId?.name || 'Customer'}</div>
@@ -428,11 +428,11 @@ const ProviderDashboard = () => {
               {/* Assigned/Active Rides Section */}
               <div className="mt-12">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Assigned & Active Rides</h3>
-                {hotelCabBookings.filter(b => ['assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(b.cabBooking?.status)).length === 0 ? (
+                {hotelCabBookings.filter(b => ['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(b.cabBooking?.status)).length === 0 ? (
                   <p className="text-gray-500 text-sm">No active rides.</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {hotelCabBookings.filter(b => ['assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(b.cabBooking?.status)).map(booking => (
+                    {hotelCabBookings.filter(b => ['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(b.cabBooking?.status)).map(booking => (
                       <div key={booking._id} className="border border-gray-200 rounded-xl p-4 bg-gray-50 flex flex-col">
                         <div className="flex justify-between items-start mb-2">
                           <span className="text-xs font-bold text-gray-500">{booking.bookingId}</span>
@@ -444,6 +444,21 @@ const ProviderDashboard = () => {
                           <p className="text-xs text-gray-500">Assigned Driver:</p>
                           <p className="text-sm font-semibold text-gray-800">{booking.cabBooking?.vendorId?.vendorDetails?.driverName || 'Unknown'}</p>
                         </div>
+                        
+                        {booking.userId && (
+                          <div className="mt-2 pt-2 border-t border-gray-200 bg-white p-2 rounded-lg">
+                            <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Customer Details</p>
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="text-sm font-bold text-gray-900">{booking.userId.name}</p>
+                                <p className="text-xs text-gray-500">{booking.userId.email}</p>
+                              </div>
+                              <a href={`tel:${booking.userId.mobile}`} className="p-2 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100">
+                                📞
+                              </a>
+                            </div>
+                          </div>
+                        )}
                         
                         <div className="mt-4">
                           {['assigned', 'on_the_way', 'arrived_at_pickup'].includes(booking.cabBooking?.status) && (

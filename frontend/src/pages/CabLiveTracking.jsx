@@ -4,7 +4,7 @@ import { useLoadScript, GoogleMap, DirectionsRenderer, Marker } from '@react-goo
 import { io } from 'socket.io-client';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, XCircle, User as UserIcon, Phone, Car, Star } from 'lucide-react';
 
 const libraries = ['places'];
 const mapContainerStyle = { width: '100%', height: '100%' };
@@ -62,8 +62,28 @@ const CabLiveTracking = () => {
       setDriverLocation(loc); // {lat, lng}
     });
 
+    socket.on('ride_cancelled', (data) => {
+      if (data.bookingId === bookingId) {
+        setStatus('cancelled');
+        toast.error('The ride has been cancelled.');
+      }
+    });
+
     return () => socket.disconnect();
   }, [bookingId]);
+
+  const handleCancelRide = async () => {
+    if (!window.confirm("Are you sure you want to cancel this ride?")) return;
+    try {
+      await api.post(`/cabs/${bookingId}/cancel`);
+      toast.success("Ride cancelled successfully");
+      setStatus('cancelled');
+      // Optionally navigate away after a delay
+      setTimeout(() => window.location.href = '/customer-dashboard', 2000);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to cancel ride");
+    }
+  };
 
   useEffect(() => {
     if (!window.google || !booking?.cabBooking) return;
@@ -139,20 +159,99 @@ const CabLiveTracking = () => {
         </GoogleMap>
 
         {status === 'requested' && (
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
             <div className="bg-white p-8 rounded-2xl shadow-xl text-center space-y-4">
               <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle size={32} />
               </div>
               <h3 className="text-xl font-bold">Request Received</h3>
-              <p className="text-gray-500 max-w-sm mb-6">Your cab request has been sent to the hotel. They will manually assign a driver before your pickup time.</p>
+              <p className="text-gray-500 max-w-sm mb-6">Your cab request has been sent to the provider. They will manually assign a driver before your pickup time.</p>
               
+              <div className="flex gap-4 w-full mt-4">
+                <button 
+                  onClick={() => window.location.href = '/customer-dashboard'}
+                  className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
+                >
+                  My Bookings
+                </button>
+                <button 
+                  onClick={handleCancelRide}
+                  className="flex-1 px-6 py-3 bg-red-100 text-red-600 rounded-xl font-bold hover:bg-red-200 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {status === 'cancelled' && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
+            <div className="bg-white p-8 rounded-2xl shadow-xl text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <XCircle size={32} />
+              </div>
+              <h3 className="text-xl font-bold">Ride Cancelled</h3>
+              <p className="text-gray-500 max-w-sm mb-6">This ride has been cancelled.</p>
               <button 
-                onClick={() => window.location.href = '/my-bookings'}
-                className="w-full mt-4 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
+                onClick={() => window.location.href = '/customer-dashboard'}
+                className="w-full mt-4 px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition"
               >
-                Go to My Bookings
+                Go Back
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Driver Details Overlay */}
+        {booking?.cabBooking?.vendorId && ['accepted', 'assigned', 'on_the_way', 'arrived_at_pickup', 'trip_started'].includes(status) && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden z-20 border border-gray-100">
+            <div className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden border-2 border-primary/20">
+                    {booking.cabBooking.vendorId.vendorDetails?.driverPhoto ? (
+                      <img src={booking.cabBooking.vendorId.vendorDetails.driverPhoto} alt="Driver" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon size={24} className="text-gray-400" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900">{booking.cabBooking.vendorId.vendorDetails?.driverName || booking.cabBooking.vendorId.businessName || 'Your Driver'}</h3>
+                    <div className="flex items-center gap-1 text-gray-500 text-sm mt-0.5">
+                      <Star size={14} className="text-yellow-500 fill-yellow-500" /> 4.8
+                    </div>
+                  </div>
+                </div>
+                {booking.cabBooking.vendorId.vendorDetails?.mobile && (
+                  <a href={`tel:${booking.cabBooking.vendorId.vendorDetails.mobile}`} className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center hover:bg-green-200 transition">
+                    <Phone size={18} />
+                  </a>
+                )}
+              </div>
+
+              {booking.cabBooking.vehicleId && (
+                <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Vehicle</p>
+                    <p className="font-semibold text-gray-800">{booking.cabBooking.vehicleId.make} {booking.cabBooking.vehicleId.model}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Plate</p>
+                    <p className="font-mono font-bold bg-yellow-100 px-2 py-0.5 rounded text-gray-800 border border-yellow-200">{booking.cabBooking.vehicleId.registrationNumber}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Cancel Button in active ride */}
+              {!['trip_started', 'completed'].includes(status) && (
+                <button 
+                  onClick={handleCancelRide}
+                  className="w-full mt-4 py-2 border-2 border-red-100 text-red-500 rounded-xl font-bold hover:bg-red-50 transition"
+                >
+                  Cancel Ride
+                </button>
+              )}
             </div>
           </div>
         )}

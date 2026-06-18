@@ -5,6 +5,9 @@ import api from '../api/axios';
 import { toast } from 'react-toastify';
 import { MapPin, Calendar, Car, Star, ShieldCheck, Clock, Navigation, Users, BedDouble } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLoadScript, Autocomplete } from '@react-google-maps/api';
+
+const libraries = ['places'];
 import AboutUs from './info/AboutUs';
 import Features from './info/Features';
 import Earning from './info/Earning';
@@ -16,6 +19,13 @@ const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries
+  });
+  
+  const autocompleteRef = React.useRef(null);
+
   // Hotel search state
   const [hotelSearch, setHotelSearch] = useState({
     destination: '',
@@ -24,6 +34,16 @@ const Home = () => {
     guests: 1,
     rooms: 1,
   });
+
+  // Cab search state
+  const [cabSearch, setCabSearch] = useState({
+    pickup: null,
+    drop: null,
+    vehicleType: 'Mini',
+    cabSourcePreference: 'ANY'
+  });
+  const cabPickupRef = React.useRef(null);
+  const cabDropRef = React.useRef(null);
 
   const handleHotelSearch = () => {
     if (!hotelSearch.destination.trim()) {
@@ -53,6 +73,42 @@ const Home = () => {
     navigate(`/hotels?${params.toString()}`);
   };
 
+  const handlePlaceChanged = () => {
+    if (autocompleteRef.current !== null) {
+      const place = autocompleteRef.current.getPlace();
+      if (place && place.formatted_address) {
+        // Extract city or name
+        let city = place.name || place.formatted_address;
+        setHotelSearch({ ...hotelSearch, destination: city });
+      }
+    }
+  };
+
+  const handleCabPlaceChanged = (ref, field) => {
+    if (ref.current !== null) {
+      const place = ref.current.getPlace();
+      if (place && place.geometry) {
+        setCabSearch(prev => ({
+          ...prev,
+          [field]: {
+            address: place.formatted_address,
+            placeId: place.place_id,
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng()
+          }
+        }));
+      }
+    }
+  };
+
+  const handleCabSearchSubmit = () => {
+    if (!cabSearch.pickup || !cabSearch.drop) {
+      toast.error('Please select both pickup and drop locations from the dropdown');
+      return;
+    }
+    navigate('/cab-booking', { state: cabSearch });
+  };
+
   React.useEffect(() => {
     const fetchFeatured = async () => {
       try {
@@ -75,14 +131,14 @@ const Home = () => {
       <section className="relative w-full h-[95vh] flex items-center justify-center">
         <div className="absolute inset-0 z-0">
           <img src="/images/hero.png" alt="Luxury Hotel" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/80 via-[#1B2E5C]/60 to-[#1B2E5C]/90"></div>
+          <div className="absolute inset-0 bg-linear-to-b from-primary/80 via-primary/60 to-primary/90"></div>
         </div>
 
         <div className="relative z-10 text-center text-white px-4 max-w-5xl mx-auto w-full pt-16">
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-heading font-bold mb-6 drop-shadow-2xl leading-tight">
               Your Journey, <br className="hidden md:block" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-yellow-200">Our Passion</span>
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-accent to-yellow-200">Our Passion</span>
             </h1>
             <p className="text-lg md:text-xl text-white/80 mb-12 max-w-2xl mx-auto font-light tracking-wide">
               Seamlessly book premium hotel stays and reliable cab rides through our integrated, luxury platform.
@@ -107,28 +163,43 @@ const Home = () => {
                   <div className="md:col-span-2">
                     <label className="block text-white/70 text-xs font-semibold mb-1 uppercase tracking-wide">Destination</label>
                     <div className="relative">
-                      <Navigation size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
-                      <input type="text" placeholder="City, hotel name..." value={hotelSearch.destination} onChange={(e) => setHotelSearch({ ...hotelSearch, destination: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 outline-none focus:border-accent transition" />
+                      {isLoaded ? (
+                        <Autocomplete
+                          onLoad={(autocomplete) => (autocompleteRef.current = autocomplete)}
+                          onPlaceChanged={handlePlaceChanged}
+                          options={{ types: ['(cities)'] }}
+                        >
+                          <>
+                            <Navigation size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
+                            <input type="text" placeholder="City, hotel name..." value={hotelSearch.destination} onChange={(e) => setHotelSearch({ ...hotelSearch, destination: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 outline-none focus:border-accent transition" />
+                          </>
+                        </Autocomplete>
+                      ) : (
+                        <>
+                          <Navigation size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
+                          <input type="text" placeholder="City, hotel name..." value={hotelSearch.destination} onChange={(e) => setHotelSearch({ ...hotelSearch, destination: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 outline-none focus:border-accent transition" />
+                        </>
+                      )}
                     </div>
                   </div>
                   <div>
                     <label className="block text-white/70 text-xs font-semibold mb-1 uppercase tracking-wide">Check-in</label>
-                    <input type="date" min={today} value={hotelSearch.checkIn} onChange={(e) => setHotelSearch({ ...hotelSearch, checkIn: e.target.value })} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white outline-none focus:border-accent transition [color-scheme:dark]" />
+                    <input type="date" min={today} value={hotelSearch.checkIn} onChange={(e) => setHotelSearch({ ...hotelSearch, checkIn: e.target.value })} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white outline-none focus:border-accent transition scheme-dark" />
                   </div>
                   <div>
                     <label className="block text-white/70 text-xs font-semibold mb-1 uppercase tracking-wide">Check-out</label>
-                    <input type="date" min={hotelSearch.checkIn || today} value={hotelSearch.checkOut} onChange={(e) => setHotelSearch({ ...hotelSearch, checkOut: e.target.value })} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white outline-none focus:border-accent transition [color-scheme:dark]" />
+                    <input type="date" min={hotelSearch.checkIn || today} value={hotelSearch.checkOut} onChange={(e) => setHotelSearch({ ...hotelSearch, checkOut: e.target.value })} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white outline-none focus:border-accent transition scheme-dark" />
                   </div>
                   <div className="flex gap-3">
                     <div className="flex-1">
                       <label className="block text-white/70 text-xs font-semibold mb-1 uppercase tracking-wide">Guests</label>
-                      <select value={hotelSearch.guests} onChange={(e) => setHotelSearch({ ...hotelSearch, guests: e.target.value })} className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-xl text-white outline-none focus:border-accent transition [color-scheme:dark]">
+                      <select value={hotelSearch.guests} onChange={(e) => setHotelSearch({ ...hotelSearch, guests: e.target.value })} className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-xl text-white outline-none focus:border-accent transition scheme-dark">
                         {[1,2,3,4,5,6,7,8].map(n => <option key={n} value={n} className="text-gray-900">{n}</option>)}
                       </select>
                     </div>
                     <div className="flex-1">
                       <label className="block text-white/70 text-xs font-semibold mb-1 uppercase tracking-wide">Rooms</label>
-                      <select value={hotelSearch.rooms} onChange={(e) => setHotelSearch({ ...hotelSearch, rooms: e.target.value })} className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-xl text-white outline-none focus:border-accent transition [color-scheme:dark]">
+                      <select value={hotelSearch.rooms} onChange={(e) => setHotelSearch({ ...hotelSearch, rooms: e.target.value })} className="w-full px-3 py-3 bg-white/10 border border-white/20 rounded-xl text-white outline-none focus:border-accent transition scheme-dark">
                         {[1,2,3,4,5].map(n => <option key={n} value={n} className="text-gray-900">{n}</option>)}
                       </select>
                     </div>
@@ -139,16 +210,55 @@ const Home = () => {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col md:flex-row gap-0 rounded-full bg-white/10 backdrop-blur-md border border-white/20 p-2 shadow-2xl">
+              <div className="flex flex-col md:flex-row gap-0 rounded-4xl md:rounded-full bg-white/10 backdrop-blur-md border border-white/20 p-2 shadow-2xl">
                 <div className="flex-1 relative border-b md:border-b-0 md:border-r border-white/20">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-accent"><MapPin size={18}/></div>
-                  <input type="text" placeholder="Pickup Location" className="w-full pl-14 pr-6 py-4 bg-transparent border-none focus:ring-0 outline-none text-white placeholder-white/60 text-lg font-light" />
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-accent z-10"><MapPin size={18}/></div>
+                  {isLoaded ? (
+                    <Autocomplete
+                      onLoad={(autocomplete) => (cabPickupRef.current = autocomplete)}
+                      onPlaceChanged={() => handleCabPlaceChanged(cabPickupRef, 'pickup')}
+                    >
+                      <input type="text" placeholder="Pickup Location" className="w-full pl-14 pr-6 py-4 bg-transparent border-none focus:ring-0 outline-none text-white placeholder-white/60 text-lg font-light" />
+                    </Autocomplete>
+                  ) : (
+                    <input type="text" placeholder="Pickup Location" className="w-full pl-14 pr-6 py-4 bg-transparent border-none focus:ring-0 outline-none text-white placeholder-white/60 text-lg font-light" />
+                  )}
                 </div>
-                <div className="flex-1 relative">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white/50"><Navigation size={18}/></div>
-                  <input type="text" placeholder="Drop Location" className="w-full pl-14 pr-6 py-4 bg-transparent border-none focus:ring-0 outline-none text-white placeholder-white/60 text-lg font-light" />
+                <div className="flex-1 relative border-b md:border-b-0 md:border-r border-white/20">
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-white/50 z-10"><Navigation size={18}/></div>
+                  {isLoaded ? (
+                    <Autocomplete
+                      onLoad={(autocomplete) => (cabDropRef.current = autocomplete)}
+                      onPlaceChanged={() => handleCabPlaceChanged(cabDropRef, 'drop')}
+                    >
+                      <input type="text" placeholder="Drop Location" className="w-full pl-14 pr-6 py-4 bg-transparent border-none focus:ring-0 outline-none text-white placeholder-white/60 text-lg font-light" />
+                    </Autocomplete>
+                  ) : (
+                    <input type="text" placeholder="Drop Location" className="w-full pl-14 pr-6 py-4 bg-transparent border-none focus:ring-0 outline-none text-white placeholder-white/60 text-lg font-light" />
+                  )}
                 </div>
-                <button onClick={() => navigate('/cab-booking')} className="md:w-auto px-10 bg-accent text-primary-dark py-4 rounded-full font-bold text-lg hover:bg-[#b59540] transition">
+                <div className="w-full md:w-48 relative border-b md:border-b-0 md:border-r border-white/20">
+                  <select 
+                    value={cabSearch.vehicleType} 
+                    onChange={(e) => setCabSearch({ ...cabSearch, vehicleType: e.target.value })}
+                    className="w-full px-6 py-4 bg-transparent border-none focus:ring-0 outline-none text-white text-lg font-light appearance-none cursor-pointer [&>option]:text-gray-900"
+                  >
+                    <option value="Mini">Mini Cab</option>
+                    <option value="Sedan">Sedan</option>
+                    <option value="SUV">SUV</option>
+                  </select>
+                </div>
+                <div className="w-full md:w-48 relative border-b md:border-b-0 border-white/20">
+                  <select 
+                    value={cabSearch.cabSourcePreference} 
+                    onChange={(e) => setCabSearch({ ...cabSearch, cabSourcePreference: e.target.value })}
+                    className="w-full px-6 py-4 bg-transparent border-none focus:ring-0 outline-none text-white text-lg font-light appearance-none cursor-pointer [&>option]:text-gray-900"
+                  >
+                    <option value="ANY">Any Cab</option>
+                    <option value="EXTERNAL">Agency Cab</option>
+                  </select>
+                </div>
+                <button onClick={handleCabSearchSubmit} className="w-full md:w-auto px-8 bg-accent text-primary-dark py-4 rounded-b-2xl md:rounded-full font-bold text-lg hover:bg-[#b59540] transition mt-2 md:mt-0">
                   Book Ride
                 </button>
               </div>
@@ -169,7 +279,7 @@ const Home = () => {
               <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.1 }} key={hotel._id} className="bg-white rounded-2xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-all duration-300 group flex flex-col">
                 <div className="relative h-64 overflow-hidden group">
                   <img src={hotel.photos?.[0] || `https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500&q=80`} alt={hotel.hotelName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                  <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent"></div>
                   {hotel.avgRating && (
                     <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full flex items-center gap-1 text-sm font-bold shadow-sm text-gray-900">
                       <Star size={14} className="text-accent fill-accent" /> {hotel.avgRating}

@@ -8,7 +8,7 @@ import { MapPin, Navigation, CheckCircle, Clock } from 'lucide-react';
 
 const mapContainerStyle = {
   width: '100%',
-  height: '400px',
+  height: '100%',
   borderRadius: '0.75rem'
 };
 
@@ -42,9 +42,7 @@ const CabDriverDashboard = () => {
           setActiveRide(activeRes.data.activeRide);
         }
         if (reqsRes.data.requests) {
-            // Need to fetch full booking details for these requests usually,
-            // but for simplicity, we assume socket gives full details or we fetch them here
-            // In a real app we'd fetch the details of these bookings.
+          setRequests(reqsRes.data.requests);
         }
       } catch (err) {
         console.error("Failed to load dashboard data");
@@ -161,9 +159,9 @@ const CabDriverDashboard = () => {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-8">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6 md:space-y-8">
       {/* Header */}
-      <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Driver Dashboard</h1>
           <p className="text-gray-500">Manage your rides and navigate</p>
@@ -182,10 +180,10 @@ const CabDriverDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left Column: Active Ride / Map */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 md:space-y-6">
           {activeRide ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-6 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full">
+              <div className="p-4 md:p-6 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
                 <div>
                   <h2 className="text-xl font-bold text-indigo-900">Active Ride</h2>
                   <p className="text-indigo-700 font-medium capitalize text-sm">Status: {activeRide.cabBooking.status.replace(/_/g, ' ')}</p>
@@ -196,7 +194,7 @@ const CabDriverDashboard = () => {
                 </div>
               </div>
               
-              <div className="p-4 bg-gray-50 border-b border-gray-100">
+              <div className="bg-gray-50 border-b border-gray-100 h-[50vh] md:h-[400px] relative">
                 {isLoaded ? (
                   <GoogleMap
                     mapContainerStyle={mapContainerStyle}
@@ -207,11 +205,11 @@ const CabDriverDashboard = () => {
                     {directions && <DirectionsRenderer directions={directions} options={{ polylineOptions: { strokeColor: '#4f46e5', strokeWeight: 5 } }} />}
                   </GoogleMap>
                 ) : (
-                  <div className="h-[400px] flex items-center justify-center bg-gray-200 rounded-xl">Loading Map...</div>
+                  <div className="h-full flex items-center justify-center bg-gray-200">Loading Map...</div>
                 )}
               </div>
 
-              <div className="p-6">
+              <div className="p-4 md:p-6">
                 <div className="flex flex-col gap-4 mb-8">
                   <div className="flex gap-4 items-start">
                     <div className="mt-1 bg-blue-100 p-2 rounded-full text-blue-600">
@@ -234,7 +232,27 @@ const CabDriverDashboard = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {activeRide.userId && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
+                    <p className="text-xs font-bold text-gray-500 uppercase mb-2">Customer Details</p>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">
+                        {activeRide.userId.name ? activeRide.userId.name.charAt(0).toUpperCase() : <UserIcon size={20} />}
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900">{activeRide.userId.name}</p>
+                        <p className="text-xs text-gray-500">{activeRide.userId.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <a href={`tel:${activeRide.userId.mobile}`} className="flex-1 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-center hover:bg-gray-50 transition text-gray-700">
+                        📞 Call {activeRide.userId.mobile}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3">
                   {['accepted', 'assigned'].includes(activeRide.cabBooking.status) && (
                     <button onClick={() => updateStatus('on_the_way')} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition">
                       Start towards Pickup
@@ -302,11 +320,11 @@ const CabDriverDashboard = () => {
                   
                   <div className="space-y-3 mb-5">
                     <div className="flex gap-3">
-                      <div className="mt-1 w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></div>
+                      <div className="mt-1 w-2 h-2 rounded-full bg-blue-500 shrink-0"></div>
                       <p className="text-sm text-gray-600 line-clamp-1" title={req.pickupLocation?.address}>{req.pickupLocation?.address || 'Pickup'}</p>
                     </div>
                     <div className="flex gap-3">
-                      <div className="mt-1 w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                      <div className="mt-1 w-2 h-2 rounded-full bg-green-500 shrink-0"></div>
                       <p className="text-sm text-gray-600 line-clamp-1" title={req.dropLocation?.address}>{req.dropLocation?.address || 'Drop'}</p>
                     </div>
                   </div>

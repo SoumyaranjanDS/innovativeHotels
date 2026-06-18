@@ -51,6 +51,10 @@ const Checkout = () => {
   const [cabPrice, setCabPrice] = useState(null);
   const [cabConfirmed, setCabConfirmed] = useState(false);
   
+  const [agencies, setAgencies] = useState([]);
+  const [selectedAgencyId, setSelectedAgencyId] = useState('');
+  const [cabSize, setCabSize] = useState('Mini');
+
   const [dropAddress, setDropAddress] = useState('');
   const [dropLocation, setDropLocation] = useState(null);
   
@@ -66,26 +70,54 @@ const Checkout = () => {
         return;
       }
       try {
-        const [holdRes, hotelRes] = await Promise.all([
-          api.post('/hotels/hold', {
-            hotelId,
-            roomId,
-            checkInDate: checkIn,
-            checkOutDate: checkOut,
-            roomsCount: parseInt(rooms) || 1,
-            guests: { adults: parseInt(guests) || 1, children: 0 },
-          }),
-          api.get(`/hotels/${hotelId}`)
-        ]);
+        const holdKey = `hotel_hold_${roomId}_${checkIn}_${checkOut}`;
+        const existingHoldStr = sessionStorage.getItem(holdKey);
+        let activeHold = null;
+
+        if (existingHoldStr) {
+          try {
+            const parsed = JSON.parse(existingHoldStr);
+            if (new Date(parsed.expiresAt).getTime() > Date.now()) {
+              activeHold = parsed;
+            } else {
+              sessionStorage.removeItem(holdKey);
+            }
+          } catch (e) {
+            sessionStorage.removeItem(holdKey);
+          }
+        }
+
+        let holdResult;
+        let hotelRes;
+
+        if (activeHold) {
+          hotelRes = await api.get(`/hotels/${hotelId}`);
+          holdResult = activeHold;
+        } else {
+          const [holdRes, hRes] = await Promise.all([
+            api.post('/hotels/hold', {
+              hotelId,
+              roomId,
+              checkInDate: checkIn,
+              checkOutDate: checkOut,
+              roomsCount: parseInt(rooms) || 1,
+              guests: { adults: parseInt(guests) || 1, children: 0 },
+            }),
+            api.get(`/hotels/${hotelId}`)
+          ]);
+          holdResult = holdRes.data.hold;
+          hotelRes = hRes;
+          sessionStorage.setItem(holdKey, JSON.stringify(holdResult));
+        }
         
-        setHoldData(holdRes.data.hold);
+        setHoldData(holdResult);
         setHotelDetails(hotelRes.data.hotel);
         if (hotelRes.data.hotel?.location) {
           setDropAddress(hotelRes.data.hotel.location.address || 'Hotel Address');
           setDropLocation(hotelRes.data.hotel.location);
         }
         
-        const expiresAt = new Date(holdRes.data.hold.expiresAt).getTime();
+        const expiresAt = new Date(holdResult.expiresAt).getTime();
         const now = Date.now();
         setTimeLeft(Math.max(0, Math.floor((expiresAt - now) / 1000)));
       } catch (err) {
@@ -104,41 +136,54 @@ const Checkout = () => {
     return () => clearInterval(id);
   }, [timeLeft]);
 
+  // Fetch agencies
+  useEffect(() => {
+    if (needPickupCab === 'external' && agencies.length === 0) {
+      api.get('/cabs/agencies').then(res => {
+        if (res.data.success) {
+          setAgencies(res.data.agencies);
+          if (res.data.agencies.length > 0) {
+            setSelectedAgencyId(res.data.agencies[0]._id);
+          }
+        }
+      }).catch(err => console.error("Failed to load cab agencies:", err));
+    }
+  }, [needPickupCab]);
+
   const formatTime = (s) => {
     if (s <= 0) return '0:00';
     return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
   };
 
-  const calculateCabFare = () => {
+  const calculateCabFare = async () => {
     if (!pickupLocation || !dropLocation) return;
     
-    const service = new window.google.maps.DistanceMatrixService();
-    service.getDistanceMatrix(
-      {
-        origins: [pickupLocation],
-        destinations: [dropLocation],
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      },
-      (response, status) => {
-        if (status === 'OK' && response.rows[0].elements[0].status === 'OK') {
-          const distanceMeters = response.rows[0].elements[0].distance.value;
-          const distanceKm = distanceMeters / 1000;
-          setCabDistance(distanceKm);
-          
-          // Basic Fare Calculation: 150 base + 15/km
-          const fare = 150 + (distanceKm * 15);
-          setCabPrice(Math.round(fare));
-        } else {
-          toast.error('Could not calculate distance. Please try a different location.');
-        }
+    try {
+      const res = await api.post('/cabs/fare-estimate', {
+        pickupLocation,
+        dropLocation,
+        vehicleType: cabSize
+      });
+      if (res.data.success) {
+        setCabDistance(parseFloat(res.data.data.distanceKm));
+        setCabPrice(Math.round(parseFloat(res.data.data.estimatedFare)));
       }
-    );
+    } catch (err) {
+      toast.error('Could not calculate cab fare.');
+      console.error(err);
+    }
   };
+
+  useEffect(() => {
+    if (pickupLocation && dropLocation) {
+      calculateCabFare();
+    }
+  }, [pickupLocation, dropLocation, cabSize]);
 
   const handlePlaceChanged = () => {
     if (autocompleteRef.current !== null) {
       const place = autocompleteRef.current.getPlace();
-      if (place.geometry && place.geometry.location) {
+      if (place && place.geometry && place.geometry.location) {
         setPickupAddress(place.formatted_address || place.name);
         setPickupLocation({
           lat: place.geometry.location.lat(),
@@ -152,7 +197,7 @@ const Checkout = () => {
   const handleDropPlaceChanged = () => {
     if (dropAutocompleteRef.current !== null) {
       const place = dropAutocompleteRef.current.getPlace();
-      if (place.geometry && place.geometry.location) {
+      if (place && place.geometry && place.geometry.location) {
         setDropAddress(place.formatted_address || place.name);
         setDropLocation({
           lat: place.geometry.location.lat(),
@@ -174,8 +219,13 @@ const Checkout = () => {
     if (!guestDetails.mobile.trim()) { toast.error('Mobile number is required'); return; }
     if (!guestDetails.email.trim()) { toast.error('Email is required'); return; }
 
-    if (needPickupCab === 'yes' && !cabConfirmed) {
+    if ((needPickupCab === 'hotel' || needPickupCab === 'external') && !cabConfirmed) {
       toast.error('Please confirm your cab booking details first.');
+      return;
+    }
+    
+    if (needPickupCab === 'external' && !selectedAgencyId) {
+      toast.error('Please select an available Cab Agency to proceed.');
       return;
     }
 
@@ -191,15 +241,16 @@ const Checkout = () => {
       const hotelBookingId = res.data.booking._id;
 
       // If cab is confirmed, automatically trigger cab booking
-      if (needPickupCab === 'yes' && cabConfirmed && pickupLocation) {
+      if ((needPickupCab === 'hotel' || needPickupCab === 'external') && cabConfirmed && pickupLocation) {
         await api.post('/cabs/book', {
           hotelBookingId,
           hotelId,
-          cabSourcePreference: 'HOTEL_LINKED',
-          vehicleType: 'Sedan',
+          cabSourcePreference: needPickupCab === 'hotel' ? 'HOTEL_LINKED' : 'EXTERNAL',
+          assignedCabProviderId: needPickupCab === 'external' ? (selectedAgencyId || undefined) : undefined,
+          vehicleType: needPickupCab === 'external' ? cabSize : 'Sedan',
           pickupLocation,
           dropLocation,
-          pickupTime: new Date(checkIn + 'T' + guestDetails.expectedArrivalTime).toISOString(),
+          pickupDateTime: new Date(checkIn + 'T' + guestDetails.expectedArrivalTime).toISOString(),
           estimatedFare: cabPrice,
           estimatedDistance: cabDistance,
           tripType: 'pickup_to_hotel'
@@ -212,7 +263,13 @@ const Checkout = () => {
       toast.success('Booking confirmed successfully!');
       navigate(`/hotel-booking/confirmation/${hotelBookingId}`);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to confirm booking.');
+      const errorMsg = err.response?.data?.message || 'Failed to confirm booking.';
+      toast.error(errorMsg);
+      if (errorMsg.toLowerCase().includes('hold') || errorMsg.toLowerCase().includes('expire') || errorMsg.toLowerCase().includes('active')) {
+        const holdKey = `hotel_hold_${roomId}_${checkIn}_${checkOut}`;
+        sessionStorage.removeItem(holdKey);
+        setTimeLeft(0);
+      }
     } finally {
       setConfirming(false);
     }
@@ -324,21 +381,49 @@ const Checkout = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Need pickup cab?</label>
-                  <div className="flex gap-4 mb-4">
-                    {['no', 'yes', 'later'].map((opt) => (
-                      <label key={opt} className={`flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer transition ${needPickupCab === opt ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                        <input type="radio" name="pickupCab" value={opt} checked={needPickupCab === opt} onChange={() => {
-                          setNeedPickupCab(opt);
-                          if (opt !== 'yes') setCabConfirmed(false);
+                  <div className="flex flex-wrap gap-4 mb-4">
+                    {[
+                      { value: 'no', label: 'No' },
+                      { value: 'hotel', label: 'Hotel Cab' },
+                      { value: 'external', label: 'External Cab' },
+                      { value: 'later', label: 'Decide Later' }
+                    ].map((opt) => (
+                      <label key={opt.value} className={`flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer transition ${needPickupCab === opt.value ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                        <input type="radio" name="pickupCab" value={opt.value} checked={needPickupCab === opt.value} onChange={() => {
+                          setNeedPickupCab(opt.value);
+                          if (opt.value === 'no' || opt.value === 'later') setCabConfirmed(false);
                         }} className="sr-only" />
-                        {opt === 'no' ? 'No' : opt === 'yes' ? 'Yes' : 'Decide Later'}
+                        {opt.label}
                       </label>
                     ))}
                   </div>
 
-                  {needPickupCab === 'yes' && isLoaded && (
+                  {(needPickupCab === 'hotel' || needPickupCab === 'external') && isLoaded && (
                     <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl space-y-4">
-                      <h4 className="font-bold text-blue-900 flex items-center gap-2"><Navigation size={18} /> Schedule Cab Pickup</h4>
+                      <h4 className="font-bold text-blue-900 flex items-center gap-2"><Navigation size={18} /> Schedule {needPickupCab === 'external' ? 'External ' : 'Hotel '}Cab Pickup</h4>
+                      
+                      {needPickupCab === 'external' && (
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                               <label className="block text-xs font-bold text-blue-800 mb-1 uppercase tracking-wider">Select Cab Agency</label>
+                               <select className="w-full p-3 border border-blue-200 rounded-xl focus:ring-2 focus:ring-primary/30 outline-none bg-white text-gray-800" value={selectedAgencyId} onChange={e => setSelectedAgencyId(e.target.value)}>
+                                  {agencies.length === 0 && <option value="">No agencies available</option>}
+                                  {agencies.map(agency => (
+                                     <option key={agency._id} value={agency._id}>{agency.name}</option>
+                                  ))}
+                               </select>
+                            </div>
+                            <div>
+                               <label className="block text-xs font-bold text-blue-800 mb-1 uppercase tracking-wider">Select Cab Size</label>
+                               <select className="w-full p-3 border border-blue-200 rounded-xl focus:ring-2 focus:ring-primary/30 outline-none bg-white text-gray-800" value={cabSize} onChange={e => setCabSize(e.target.value)}>
+                                  <option value="Mini">Mini (4 Seater)</option>
+                                  <option value="Sedan">Sedan (4 Seater Premium)</option>
+                                  <option value="SUV">SUV (6 Seater)</option>
+                               </select>
+                            </div>
+                         </div>
+                      )}
+
                       <div className="space-y-3">
                         <div>
                           <label className="block text-xs font-bold text-blue-800 mb-1 uppercase tracking-wider">Pickup Location</label>
@@ -451,10 +536,12 @@ const Checkout = () => {
                 {holdData.priceSnapshot.discountAmount > 0 && (
                   <div className="flex justify-between text-green-600"><span>Discount</span><span>-₹{holdData.priceSnapshot.discountAmount.toLocaleString()}</span></div>
                 )}
-                {needPickupCab === 'yes' && cabConfirmed && cabPrice !== null && (
-                  <div className="flex justify-between text-blue-700 font-semibold bg-blue-50 -mx-2 px-2 py-1 rounded">
-                    <span>Cab Fare (Est.)</span>
-                    <span>₹{cabPrice.toLocaleString()}</span>
+                {(needPickupCab === 'hotel' || needPickupCab === 'external') && cabConfirmed && cabPrice !== null && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Cab Fare {needPickupCab === 'external' ? '(Pay to Driver)' : ''}</span>
+                    <span className="font-medium">
+                      {needPickupCab === 'external' ? 'Pay directly' : `₹${cabPrice.toLocaleString()}`}
+                    </span>
                   </div>
                 )}
               </div>
@@ -462,7 +549,7 @@ const Checkout = () => {
               <div className="flex justify-between items-center mb-6">
                 <span className="text-lg font-bold text-gray-800">Total Payable</span>
                 <span className="text-2xl font-bold text-primary">
-                  ₹{(holdData.priceSnapshot.totalPrice + (needPickupCab === 'yes' && cabConfirmed ? cabPrice : 0)).toLocaleString()}
+                  ₹{(holdData.priceSnapshot.totalPrice + (needPickupCab === 'hotel' && cabConfirmed ? cabPrice : 0)).toLocaleString()}
                 </span>
               </div>
 
@@ -479,7 +566,7 @@ const Checkout = () => {
                     : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                {confirming ? 'Processing...' : holdExpired ? 'Hold Expired — Go Back' : paymentMode === 'online' ? `Pay ₹${(holdData.priceSnapshot.totalPrice + (needPickupCab === 'yes' && cabConfirmed ? cabPrice : 0)).toLocaleString()} & Confirm` : 'Confirm Booking'}
+                {confirming ? 'Processing...' : holdExpired ? 'Hold Expired — Go Back' : paymentMode === 'online' ? `Pay ₹${(holdData.priceSnapshot.totalPrice + (needPickupCab === 'hotel' && cabConfirmed ? cabPrice : 0)).toLocaleString()} & Confirm` : 'Confirm Booking'}
               </button>
             </div>
           </div>

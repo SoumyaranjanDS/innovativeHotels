@@ -144,25 +144,50 @@ exports.getHotelCabs = async (req, res, next) => {
   }
 };
 
-// @desc    Get cab bookings for hotel-linked cabs
+// @desc    Get cab bookings for hotel-linked cabs and independent cabs
 // @route   GET /api/hotel/cab-bookings
 // @access  Private (Provider)
 exports.getHotelCabBookings = async (req, res, next) => {
   try {
-    const hotel = await Hotel.findOne({ providerId: req.user.id });
-    if (!hotel) {
-      return res.status(404).json({ success: false, message: 'Hotel not found' });
-    }
+    const User = require('../models/User');
+    const user = await User.findById(req.user.id);
+    const Hotel = require('../models/Hotel');
+    
+    let cabBookings = [];
 
-    const cabBookings = await Booking.find({
-      bookingType: 'CAB',
-      'cabBooking.hotelId': hotel._id,
-      'cabBooking.cabSourceType': 'HOTEL_LINKED'
-    })
-    .populate('userId', 'name email')
-    .populate('cabBooking.vendorId')
-    .populate('cabBooking.vehicleId')
-    .populate('cabBooking.hotelBookingId', 'hotelBooking.status');
+    if (user.providerType === 'Cab') {
+       // Independent Cab Agency
+       const CabVendor = require('../models/CabVendor');
+       const agencyVendors = await CabVendor.find({ providerId: req.user.id });
+       const vendorIds = agencyVendors.map(v => v._id);
+
+       cabBookings = await Booking.find({
+          bookingType: 'CAB',
+          'cabBooking.cabSourceType': { $in: ['INDEPENDENT', 'AGENCY'] },
+          'cabBooking.assignedCabProviderId': req.user.id
+       })
+       .populate('userId', 'name email mobile')
+       .populate('cabBooking.vendorId')
+       .populate('cabBooking.vehicleId')
+       .populate('cabBooking.hotelBookingId', 'hotelBooking.status');
+
+    } else {
+       // Hotel Provider
+       const hotel = await Hotel.findOne({ providerId: req.user.id });
+       if (!hotel) {
+         return res.status(200).json({ success: true, count: 0, data: [] });
+       }
+
+       cabBookings = await Booking.find({
+         bookingType: 'CAB',
+         'cabBooking.hotelId': hotel._id,
+         'cabBooking.cabSourceType': 'HOTEL_LINKED'
+       })
+       .populate('userId', 'name email mobile')
+       .populate('cabBooking.vendorId')
+       .populate('cabBooking.vehicleId')
+       .populate('cabBooking.hotelBookingId', 'hotelBooking.status');
+    }
 
     res.status(200).json({
       success: true,
@@ -290,30 +315,55 @@ exports.assignCabBooking = async (req, res, next) => {
     const { id } = req.params;
     const { vendorId, vehicleId } = req.body;
 
-    const hotel = await Hotel.findOne({ providerId: req.user.id });
-    if (!hotel) {
-      return res.status(404).json({ success: false, message: 'Hotel not found' });
-    }
+    const User = require('../models/User');
+    const user = await User.findById(req.user.id);
+    const Hotel = require('../models/Hotel');
 
-    const booking = await Booking.findOne({
-      _id: id,
-      bookingType: 'CAB',
-      'cabBooking.hotelId': hotel._id,
-      'cabBooking.status': 'requested'
-    }).populate('cabBooking.hotelBookingId');
+    let booking;
+    let vendor;
 
-    if (!booking) {
-      return res.status(404).json({ success: false, message: 'Cab booking request not found or already processed' });
+    if (user.providerType === 'Cab') {
+      booking = await Booking.findOne({
+        _id: id,
+        bookingType: 'CAB',
+        'cabBooking.cabSourceType': { $in: ['INDEPENDENT', 'AGENCY'] },
+        'cabBooking.status': { $in: ['requested', 'external_cabs_notified'] }
+      }).populate('cabBooking.hotelBookingId');
+
+      if (!booking) {
+        return res.status(404).json({ success: false, message: 'Cab booking request not found or already processed' });
+      }
+
+      vendor = await CabVendor.findOne({ _id: vendorId, providerId: req.user.id });
+      if (!vendor) {
+        return res.status(400).json({ success: false, message: 'Invalid cab vendor selected' });
+      }
+
+    } else {
+      const hotel = await Hotel.findOne({ providerId: req.user.id });
+      if (!hotel) {
+        return res.status(404).json({ success: false, message: 'Hotel not found' });
+      }
+
+      booking = await Booking.findOne({
+        _id: id,
+        bookingType: 'CAB',
+        'cabBooking.hotelId': hotel._id,
+        'cabBooking.status': { $in: ['requested', 'hotel_cabs_notified'] }
+      }).populate('cabBooking.hotelBookingId');
+
+      if (!booking) {
+        return res.status(404).json({ success: false, message: 'Cab booking request not found or already processed' });
+      }
+
+      vendor = await CabVendor.findOne({ _id: vendorId, hotelId: hotel._id });
+      if (!vendor) {
+        return res.status(400).json({ success: false, message: 'Invalid cab vendor selected' });
+      }
     }
 
     if (booking.cabBooking?.hotelBookingId && booking.cabBooking.hotelBookingId.hotelBooking?.status === 'pending_approval') {
       return res.status(400).json({ success: false, message: 'Cannot assign a cab until the associated hotel booking is approved.' });
-    }
-
-    // Verify vendor belongs to this hotel
-    const vendor = await CabVendor.findOne({ _id: vendorId, hotelId: hotel._id });
-    if (!vendor) {
-      return res.status(400).json({ success: false, message: 'Invalid cab vendor selected' });
     }
 
     booking.cabBooking.status = 'assigned';

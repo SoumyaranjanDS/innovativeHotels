@@ -212,8 +212,8 @@ const DriverDashboard = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto mt-8 mb-12 px-4 sm:px-6">
-      <div className="flex items-center gap-4 mb-8">
+    <div className="max-w-6xl mx-auto mt-4 md:mt-8 mb-12 px-4 sm:px-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 md:mb-8">
         <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center">
           <Car size={32} />
         </div>
@@ -223,10 +223,10 @@ const DriverDashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
         {/* Left Column: Vehicle & Profile */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="lg:col-span-1 space-y-4 md:space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="bg-gray-50 p-4 border-b border-gray-100 font-bold text-gray-700">
               Your Profile
@@ -296,7 +296,7 @@ const DriverDashboard = () => {
 
         {/* Right Column: Active Ride */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-full">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-full flex flex-col">
             <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-center">
               <span className="font-bold text-gray-700">Active Ride</span>
               {activeRide && (
@@ -306,7 +306,7 @@ const DriverDashboard = () => {
               )}
             </div>
             
-            <div className="p-8 h-full flex flex-col">
+            <div className="p-4 md:p-8 flex-1 flex flex-col min-h-[300px]">
               {activeRide ? (
                 <div className="flex-1 flex flex-col">
                   {/* Ride Header */}
@@ -318,9 +318,9 @@ const DriverDashboard = () => {
                   </div>
 
                   {/* Route & Map Area */}
-                  <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="relative pl-8 space-y-8">
-                      <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gray-200"></div>
+                  <div className="mb-8 md:mb-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="relative pl-6 md:pl-8 space-y-6 md:space-y-8">
+                      <div className="absolute left-[9px] md:left-[11px] top-2 bottom-2 w-0.5 bg-gray-200"></div>
                       
                       <div className="relative">
                         <div className="absolute -left-8 top-1 w-6 h-6 bg-green-100 border-2 border-green-500 rounded-full flex items-center justify-center">
@@ -359,7 +359,7 @@ const DriverDashboard = () => {
                   </div>
 
                   {/* Passenger Info */}
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-8 flex justify-between items-center">
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 md:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
                       <p className="text-xs text-blue-800 uppercase font-bold mb-1">Passenger</p>
                       <p className="font-bold text-blue-900">{activeRide.userId?.name || 'Customer'}</p>
@@ -408,8 +408,8 @@ const DriverDashboard = () => {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
-                  <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6">
+                <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center text-gray-500 bg-gray-50/50 rounded-xl border border-dashed border-gray-200 p-6 m-0 md:m-4">
+                  <div className="w-20 h-20 md:w-24 md:h-24 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center mb-6">
                     <Car size={48} className="text-gray-300" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-700 mb-2">No Active Rides</h3>

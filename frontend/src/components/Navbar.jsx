@@ -73,10 +73,7 @@ const Navbar = () => {
           {/* Left: Brand / Logo */}
           <Link to="/" className="flex items-center gap-3 z-50">
             <div className="flex flex-col">
-              <span className="font-heading font-normal text-3xl tracking-tight text-[#2C2C2C] flex items-center gap-2">
-                <Crown className="text-accent" size={24} strokeWidth={1.5} />
-                INNO
-              </span>
+              <img src="/inno-logo.jpeg" alt="Innovative Hotel Solution" className="h-16 object-contain rounded-xl shadow-sm" />
             </div>
           </Link>
 
@@ -95,13 +92,7 @@ const Navbar = () => {
 
           {/* Right: CTA & Actions */}
           <div className="hidden lg:flex items-center gap-6 z-50">
-            <div className="flex items-center gap-2 text-[#2C2C2C]">
-              <div className="w-8 h-8 rounded-full bg-[#FAF9F5] border border-accent/20 flex items-center justify-center text-accent">
-                <Phone size={14} />
-              </div>
-              <span className="text-sm font-bold">1-800-INNO-HOTEL</span>
-            </div>
-            
+
             {user ? (
               <div className="relative z-50" ref={dropdownRef}>
                 <button 

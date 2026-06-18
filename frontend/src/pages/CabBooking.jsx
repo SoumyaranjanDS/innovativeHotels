@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
 
@@ -113,7 +113,12 @@ const CabBooking = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto space-y-8">
-        <h1 className="text-3xl font-bold text-gray-900">Book a Cab</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-gray-900">Book a Cab</h1>
+          <Link to="/" className="text-[#8A9A74] hover:text-[#788863] font-medium text-sm flex items-center gap-1">
+            &larr; Back to Home
+          </Link>
+        </div>
 
         <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-100 space-y-6">
           <div className="space-y-4">
@@ -195,7 +200,7 @@ const CabBooking = () => {
           <button 
             onClick={() => getEstimate(pickup, drop, vehicleType)}
             disabled={loading}
-            className="w-full py-4 bg-primary text-white rounded-xl font-semibold hover:bg-primary-light transition"
+            className="w-full py-4 bg-[#8A9A74] text-white rounded-xl font-semibold hover:bg-[#788863] transition"
           >
             {loading ? 'Calculating...' : 'Get Fare Estimate'}
           </button>
@@ -224,7 +229,7 @@ const CabBooking = () => {
             <button 
               onClick={handleConfirm}
               disabled={loading}
-              className="w-full py-4 bg-primary text-white rounded-xl font-bold text-lg hover:bg-primary-light transition shadow-md"
+              className="w-full py-4 bg-[#8A9A74] text-white rounded-xl font-bold text-lg hover:bg-[#788863] transition shadow-md"
             >
               Confirm Cab (Pay on Delivery)
             </button>

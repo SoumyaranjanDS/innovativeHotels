@@ -120,7 +120,7 @@ function App() {
             </Route>
 
           </Routes>
-          <Agentation />
+          {!import.meta.env.PROD && <Agentation />}
         </div>
       </Router>
     </AuthProvider>

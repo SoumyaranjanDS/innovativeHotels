@@ -81,12 +81,12 @@ const HotelListingPage = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Search Summary Bar */}
-      <div className="bg-primary text-white py-6">
+      <div className="bg-[#FAF9F5] text-gray-900 py-6 pt-32 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-2xl font-heading font-bold mb-1">
+          <h1 className="text-3xl font-heading font-bold mb-2">
             Hotels in {city || 'All Locations'}
           </h1>
-          <p className="text-white/70 text-sm">
+          <p className="text-gray-600 font-medium">
             {checkIn && checkOut && (
               <>{new Date(checkIn).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} — {new Date(checkOut).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · {nights} night{nights > 1 ? 's' : ''} · </>
             )}

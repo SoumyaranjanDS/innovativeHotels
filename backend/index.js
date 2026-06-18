@@ -21,9 +21,14 @@ require('./src/sockets/support.socket')(io);
 
 // Middleware
 app.use(express.json());
-app.use(cors({ origin: true, credentials: true }));
+
+const corsOptions = {
+  origin: ['https://bangalorerapid.online', 'http://localhost:5173'],
+  credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(helmet());
-// app.use(morgan('dev'));
+app.use(morgan('dev'));
 
 // Database connection
 mongoose.connect(process.env.MONGO_URI)

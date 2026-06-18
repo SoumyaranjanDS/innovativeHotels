@@ -96,7 +96,7 @@ const Navbar = () => {
           {/* Right: CTA & Actions */}
           <div className="hidden lg:flex items-center gap-6 z-50">
             <div className="flex items-center gap-2 text-[#2C2C2C]">
-              <div className="w-8 h-8 rounded-full bg-[#FAF9F5] border border-[#8A9A74]/20 flex items-center justify-center text-[#8A9A74]">
+              <div className="w-8 h-8 rounded-full bg-[#FAF9F5] border border-accent/20 flex items-center justify-center text-accent">
                 <Phone size={14} />
               </div>
               <span className="text-sm font-bold">1-800-INNO-HOTEL</span>
@@ -154,7 +154,7 @@ const Navbar = () => {
             ) : (
               <div className="flex items-center gap-3">
                 <Link to="/login" className="text-sm font-medium text-[#2C2C2C] hover:text-accent transition">Log in</Link>
-                <Link to="/register" className="bg-[#8A9A74] hover:bg-[#788863] text-white px-5 py-2.5 rounded-full text-sm font-medium transition shadow-md shadow-[#8A9A74]/20">
+                <Link to="/register" className="bg-accent hover:bg-[#788863] text-white px-5 py-2.5 rounded-full text-sm font-medium transition shadow-md shadow-accent/20">
                   Sign up
                 </Link>
               </div>
@@ -179,7 +179,7 @@ const Navbar = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed inset-0 bg-[#FAF9F5] z-[40] flex flex-col items-center justify-center lg:hidden"
+            className="fixed inset-0 bg-[#FAF9F5] z-40 flex flex-col items-center justify-center lg:hidden"
           >
             <div className="flex flex-col items-center gap-8 w-full px-6">
               {navLinks.map((link, i) => (

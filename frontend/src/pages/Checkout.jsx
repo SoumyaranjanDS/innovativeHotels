@@ -275,6 +275,28 @@ const Checkout = () => {
     }
   };
 
+  const handleCancelBooking = async () => {
+    if (!window.confirm('Are you sure you want to cancel this booking? This will release the room for others.')) return;
+    
+    try {
+      setConfirming(true);
+      if (holdData?._id) {
+        await api.post('/hotels/cancel-hold', { holdId: holdData._id });
+      }
+      const holdKey = `hotel_hold_${roomId}_${checkIn}_${checkOut}`;
+      sessionStorage.removeItem(holdKey);
+      toast.success('Booking cancelled successfully.');
+      navigate(`/hotels/${hotelId}`);
+    } catch (error) {
+      toast.error('Failed to cancel booking. It may have already expired.');
+      const holdKey = `hotel_hold_${roomId}_${checkIn}_${checkOut}`;
+      sessionStorage.removeItem(holdKey);
+      navigate(`/hotels/${hotelId}`);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   const nights = holdData?.dates?.length || 0;
   const holdExpired = timeLeft <= 0 && holdData;
 
@@ -296,7 +318,7 @@ const Checkout = () => {
           <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">Unable to Reserve Room</h2>
           <p className="text-gray-500 mb-6">The room may no longer be available. Please try again.</p>
-          <Link to="/" className="px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary-light transition">Search Again</Link>
+          <Link to="/" className="px-6 py-3 bg-primary text-gray-900 rounded-xl font-semibold hover:bg-primary-light transition">Search Again</Link>
         </div>
       </div>
     );
@@ -478,14 +500,14 @@ const Checkout = () => {
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Estimated Fare</p>
-                            <p className="font-bold text-lg text-primary">{cabPrice !== null ? `₹${cabPrice}` : '--'}</p>
+                            <p className="font-bold text-lg text-black">{cabPrice !== null ? `₹${cabPrice}` : '--'}</p>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => setCabConfirmed(true)}
                           disabled={cabConfirmed || cabPrice === null}
-                          className={`px-6 py-3 md:py-2 rounded-xl font-bold transition w-full md:w-auto ${cabConfirmed ? 'bg-green-100 text-green-700 cursor-default' : (cabPrice === null ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary-dark shadow-md')}`}
+                          className={`px-6 py-3 md:py-2 rounded-xl font-bold transition w-full md:w-auto ${cabConfirmed ? 'bg-green-100 text-green-700 cursor-default' : (cabPrice === null ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-primary text-gray-900 hover:bg-primary-light shadow-md')}`}
                         >
                           {cabConfirmed ? '✓ Cab Confirmed' : 'Confirm Cab Booking'}
                         </button>
@@ -548,7 +570,7 @@ const Checkout = () => {
 
               <div className="flex justify-between items-center mb-6">
                 <span className="text-lg font-bold text-gray-800">Total Payable</span>
-                <span className="text-2xl font-bold text-primary">
+                <span className="text-2xl font-bold text-black">
                   ₹{(holdData.priceSnapshot.totalPrice + (needPickupCab === 'hotel' && cabConfirmed ? cabPrice : 0)).toLocaleString()}
                 </span>
               </div>
@@ -560,13 +582,21 @@ const Checkout = () => {
               <button
                 onClick={handleConfirm}
                 disabled={holdExpired || confirming}
-                className={`w-full py-4 rounded-xl font-bold text-lg transition shadow-md ${
+                className={`w-full py-4 rounded-xl font-bold text-lg transition shadow-md mb-3 ${
                   !holdExpired && !confirming
-                    ? 'bg-primary text-white hover:bg-primary-light'
+                    ? 'bg-green-500 text-gray-900 hover:bg-green-600'
                     : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                 }`}
               >
                 {confirming ? 'Processing...' : holdExpired ? 'Hold Expired — Go Back' : paymentMode === 'online' ? `Pay ₹${(holdData.priceSnapshot.totalPrice + (needPickupCab === 'hotel' && cabConfirmed ? cabPrice : 0)).toLocaleString()} & Confirm` : 'Confirm Booking'}
+              </button>
+
+              <button
+                onClick={handleCancelBooking}
+                disabled={confirming}
+                className="w-full py-3 rounded-xl font-bold text-gray-600 bg-gray-50 hover:bg-red-50 hover:text-red-600 border border-gray-100 hover:border-red-200 transition"
+              >
+                Cancel Booking
               </button>
             </div>
           </div>

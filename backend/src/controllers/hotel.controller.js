@@ -512,3 +512,40 @@ exports.confirmBooking = async (req, res) => {
     res.status(400).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Cancel room hold
+// @route   POST /api/hotels/cancel-hold
+exports.cancelHold = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const { holdId } = req.body;
+    const hold = await BookingHold.findById(holdId).session(session);
+    
+    if (!hold) throw new Error('Hold record not found');
+    if (hold.status !== 'active') throw new Error('Hold is not active');
+    
+    // Update availability: deduct from heldRooms
+    for (const date of hold.dates) {
+      await HotelAvailability.updateOne(
+        { hotelId: hold.hotelId, roomId: hold.roomId, date },
+        { $inc: { heldRooms: -hold.roomsCount } },
+        { session }
+      );
+    }
+    
+    // Mark hold as released
+    hold.status = 'released';
+    await hold.save({ session });
+    
+    await session.commitTransaction();
+    session.endSession();
+    
+    res.status(200).json({ success: true, message: 'Hold cancelled successfully' });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+

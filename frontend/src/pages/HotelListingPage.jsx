@@ -164,7 +164,7 @@ const HotelListingPage = () => {
                           <div>
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <h3 className="text-xl font-heading font-bold text-gray-900 group-hover:text-primary transition">{hotel.hotelName}</h3>
+                                <h3 className="text-xl font-heading font-bold text-gray-900 transition">{hotel.hotelName}</h3>
                                 <p className="text-gray-500 text-sm flex items-center gap-1 mt-1">
                                   <MapPin size={14} /> {hotel.address || hotel.city}{hotel.state ? `, ${hotel.state}` : ''}
                                 </p>
@@ -195,14 +195,7 @@ const HotelListingPage = () => {
                               {hotel.category && <span className="text-xs text-gray-400 uppercase tracking-wide">{hotel.category}</span>}
                             </div>
                             <div className="text-right">
-                              {hotel.startingPrice ? (
-                                <>
-                                  <p className="text-2xl font-bold text-primary">₹{hotel.startingPrice.toLocaleString()}</p>
-                                  <p className="text-xs text-gray-400">per night · {nights} night{nights > 1 ? 's' : ''}</p>
-                                </>
-                              ) : (
-                                <p className="text-sm text-gray-400">Price on request</p>
-                              )}
+                              <p className="text-xl font-bold text-black">{hotel.rooms?.length || 0} {hotel.rooms?.length === 1 ? 'Room' : 'Rooms'} Available</p>
                             </div>
                           </div>
                         </div>

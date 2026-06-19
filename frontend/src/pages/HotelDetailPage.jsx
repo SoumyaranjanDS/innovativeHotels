@@ -237,13 +237,7 @@ const HotelDetailPage = () => {
                 Available Rooms {nights > 0 && <span className="text-base font-normal text-gray-400">for {nights} night{nights > 1 ? 's' : ''}</span>}
               </h2>
 
-              {!checkIn || !checkOut ? (
-                <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-xl text-center">
-                  <AlertCircle size={24} className="mx-auto text-yellow-600 mb-2" />
-                  <p className="text-yellow-800 font-medium">Select check-in and check-out dates to see room availability and pricing.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
+              <div className="space-y-4">
                   {hotel.rooms?.map((room) => (
                     <motion.div key={room._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                       <div className="flex flex-col md:flex-row">
@@ -279,7 +273,7 @@ const HotelDetailPage = () => {
                         {/* Price & Action */}
                         <div className="p-6 flex flex-col justify-between items-end border-t md:border-t-0 md:border-l border-gray-100 md:w-52">
                           <div className="text-right">
-                            <p className="text-2xl font-bold text-primary">₹{(room.pricePerNight || room.price).toLocaleString()}</p>
+                            <p className="text-2xl font-bold text-black">₹{(room.pricePerNight || room.price).toLocaleString()}</p>
                             <p className="text-xs text-gray-400">per night</p>
                             {nights > 0 && (
                               <p className="text-sm text-gray-600 mt-1 font-medium">
@@ -293,7 +287,7 @@ const HotelDetailPage = () => {
                             onClick={() => handleSelectRoom(room)}
                             className={`mt-4 w-full px-6 py-3 rounded-xl font-bold text-sm transition ${
                               room.available
-                                ? 'bg-primary text-white hover:bg-primary-light shadow-md'
+                                ? 'bg-green-400 text-gray-900 hover:bg-green-500 shadow-md' 
                                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                             }`}
                           >
@@ -304,7 +298,6 @@ const HotelDetailPage = () => {
                     </motion.div>
                   ))}
                 </div>
-              )}
             </div>
 
             {/* Nearby Places */}
@@ -365,19 +358,36 @@ const HotelDetailPage = () => {
           <div className="lg:w-80 flex-shrink-0">
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 sticky top-8">
               <h3 className="font-bold text-gray-800 text-lg mb-4">Your Stay</h3>
+              <div className="mb-6 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Check-in</label>
+                  <input type="date" className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={checkIn} onChange={(e) => { const p = new URLSearchParams(searchParams); p.set('checkIn', e.target.value); navigate(`/hotels/${hotelId}?${p.toString()}`); }} min={new Date().toISOString().split('T')[0]} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Check-out</label>
+                  <input type="date" className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={checkOut} onChange={(e) => { const p = new URLSearchParams(searchParams); p.set('checkOut', e.target.value); navigate(`/hotels/${hotelId}?${p.toString()}`); }} min={checkIn || new Date().toISOString().split('T')[0]} />
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Guests</label>
+                    <input type="number" min="1" className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={guests} onChange={(e) => { const p = new URLSearchParams(searchParams); p.set('guests', e.target.value); navigate(`/hotels/${hotelId}?${p.toString()}`); }} />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Rooms</label>
+                    <input type="number" min="1" className="w-full border border-gray-200 rounded-lg p-2 text-sm" value={rooms} onChange={(e) => { const p = new URLSearchParams(searchParams); p.set('rooms', e.target.value); navigate(`/hotels/${hotelId}?${p.toString()}`); }} />
+                  </div>
+                </div>
+              </div>
+
               {checkIn && checkOut ? (
                 <>
-                  <div className="space-y-3 text-sm mb-4">
-                    <div className="flex justify-between"><span className="text-gray-500">Check-in</span><span className="font-semibold">{new Date(checkIn).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">Check-out</span><span className="font-semibold">{new Date(checkOut).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>
+                  <div className="space-y-3 text-sm mb-4 border-t border-gray-100 pt-4">
                     <div className="flex justify-between"><span className="text-gray-500">Duration</span><span className="font-semibold">{nights} night{nights > 1 ? 's' : ''}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">Guests</span><span className="font-semibold">{guests}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">Rooms</span><span className="font-semibold">{rooms}</span></div>
                   </div>
                   {hotel.rooms?.some(r => r.available) && (
                     <div className="bg-primary/5 p-3 rounded-lg text-center">
                       <p className="text-sm text-gray-600">Starting from</p>
-                      <p className="text-2xl font-bold text-primary">
+                      <p className="text-2xl font-bold text-black">
                         ₹{Math.min(...hotel.rooms.filter(r => r.available).map(r => r.pricePerNight || r.price)).toLocaleString()}
                       </p>
                       <p className="text-xs text-gray-400">per night</p>
@@ -385,7 +395,7 @@ const HotelDetailPage = () => {
                   )}
                 </>
               ) : (
-                <p className="text-sm text-gray-500">Select dates from the search to see pricing and availability.</p>
+                <p className="text-sm text-gray-500 border-t border-gray-100 pt-4">Select dates to see pricing and availability.</p>
               )}
             </div>
           </div>

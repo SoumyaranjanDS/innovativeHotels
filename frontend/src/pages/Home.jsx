@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
-import { MapPin, Navigation, ArrowRight, ShieldCheck, Clock, Users, Building2, CheckCircle2, ChevronDown, Phone, Mail, Car, Search, CalendarCheck, Key, Crown, Star } from 'lucide-react';
+import { MapPin, Navigation, ArrowRight, ShieldCheck, Clock, Users, Building2, CheckCircle2, ChevronDown, Phone, Mail, Car, Search, CalendarCheck, Key, Crown, Star, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
 
@@ -170,7 +170,9 @@ const Home = () => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [activeTab, setActiveTab] = useState('hotels');
   const [featuredHotels, setFeaturedHotels] = useState([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
@@ -219,7 +221,7 @@ const Home = () => {
       try {
         const res = await api.get('/hotels/search');
         if (res.data && res.data.data) {
-          setFeaturedHotels(res.data.data.slice(0, 3));
+          setFeaturedHotels(res.data.data.slice(0, 9));
         }
       } catch (err) {
         console.error('Failed to fetch featured hotels');
@@ -233,7 +235,9 @@ const Home = () => {
   const faqs = [
     { q: "How do I make a reservation?", a: "You can easily book a hotel or cab through our online portal. Simply use the search form, select your desired dates or route, and complete the payment securely." },
     { q: "What is your cancellation policy?", a: "We offer flexible cancellation policies. For most bookings, you can cancel up to 24 hours in advance for a full refund." },
-    { q: "Are the cabs driven by professionals?", a: "Absolutely. All our partner drivers undergo rigorous background checks and professional training to ensure your safety and comfort." }
+    { q: "Are the cabs driven by professionals?", a: "Absolutely. All our partner drivers undergo rigorous background checks and professional training to ensure your safety and comfort." },
+    { q: "How do I contact customer support?", a: "Our support team is available 24/7. You can reach us via the support dashboard or by calling 1-800-INNO-HOTEL directly." },
+    { q: "Do you offer corporate booking accounts?", a: "Yes, we provide specialized accounts for businesses with custom reporting and bulk booking options. Please contact our sales team for details." }
   ];
 
   return (
@@ -269,7 +273,10 @@ const Home = () => {
 
             <motion.button 
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.3 }}
-              onClick={() => setShowSearchModal(true)}
+              onClick={() => {
+                if (!user) navigate('/login');
+                else setShowSearchModal(true);
+              }}
               className="group flex items-center bg-[#8A9A74] hover:bg-[#788863] text-white rounded-full pl-6 pr-2 py-2 font-medium text-sm transition-colors mb-16 shadow-lg shadow-[#8A9A74]/30"
             >
               Check Availability
@@ -412,45 +419,53 @@ const Home = () => {
         </div>
 
         {featuredHotels.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {featuredHotels.map((hotel, index) => (
-              <motion.div 
-                initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.1 }} 
-                key={hotel._id} 
-                className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 group flex flex-col"
-              >
-                <div className="relative h-64 overflow-hidden rounded-t-3xl rounded-b-xl m-2">
-                  <img src={hotel.photos?.[0] || `https://images.unsplash.com/photo-1566073771259-6a8506099945`} alt={hotel.hotelName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
-                  <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-[#2C2C2C] flex items-center gap-2">
-                    <Building2 size={12} className="text-[#8A9A74]"/> 120m²
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {featuredHotels.slice(currentSlide * 3, (currentSlide + 1) * 3).map((hotel, index) => (
+                <motion.div 
+                  initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.1 }} 
+                  key={hotel._id} 
+                  className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 group flex flex-col"
+                >
+                  <div className="relative h-64 overflow-hidden rounded-t-3xl rounded-b-xl m-2">
+                    <img src={hotel.photos?.[0] || `https://images.unsplash.com/photo-1566073771259-6a8506099945`} alt={hotel.hotelName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                    <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-[#2C2C2C] flex items-center gap-2">
+                      <Building2 size={12} className="text-[#8A9A74]"/> 120m²
+                    </div>
                   </div>
-                </div>
-                <div className="p-6 flex-1 flex flex-col">
-                  <h3 className="text-xl font-heading font-medium text-[#2C2C2C] mb-2">{hotel.hotelName}</h3>
-                  <p className="text-sm text-gray-500 font-light leading-relaxed mb-6">
-                    Spacious rooms with panoramic windows and terraces for a large family.
-                  </p>
-                  
-                  <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-4">
-                    <span className="text-gray-400 text-sm">from <strong className="text-[#2C2C2C]">₹{hotel.startingPrice || 4200}</strong></span>
-                    <Link to={`/hotels/${hotel._id}`} className="text-xs font-medium text-gray-500 hover:text-[#8A9A74] transition-colors flex items-center gap-2">
-                      Details <ArrowRight size={14} className="text-[#8A9A74]" />
-                    </Link>
+                  <div className="p-6 flex-1 flex flex-col">
+                    <h3 className="text-xl font-heading font-medium text-[#2C2C2C] mb-2">{hotel.hotelName}</h3>
+                    <p className="text-sm text-gray-500 font-light leading-relaxed mb-6">
+                      Spacious rooms with panoramic windows and terraces for a large family.
+                    </p>
+                    
+                    <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-4">
+                      <span className="text-gray-400 text-sm">from <strong className="text-[#2C2C2C]">₹{hotel.startingPrice || 4200}</strong></span>
+                      <Link to={`/hotels/${hotel._id}`} className="text-xs font-medium text-gray-500 hover:text-[#8A9A74] transition-colors flex items-center gap-2">
+                        Details <ArrowRight size={14} className="text-[#8A9A74]" />
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Functional pagination dots */}
+            {Math.ceil(featuredHotels.length / 3) > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-10">
+                {Array.from({ length: Math.ceil(featuredHotels.length / 3) }).map((_, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => setCurrentSlide(idx)}
+                    className={`w-2.5 h-2.5 rounded-full transition-colors ${currentSlide === idx ? 'bg-[#8A9A74]' : 'bg-gray-300 hover:bg-gray-400'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <p className="text-gray-500 font-light">Loading premium destinations...</p>
         )}
-        
-        {/* Decorative pagination dots */}
-        <div className="flex justify-center items-center gap-2 mt-10">
-          <div className="w-2.5 h-2.5 bg-[#8A9A74] rounded-full"></div>
-          <div className="w-2.5 h-2.5 bg-gray-300 rounded-full"></div>
-          <div className="w-2.5 h-2.5 bg-gray-300 rounded-full"></div>
-        </div>
       </section>
 
       {/* ================= HOW WE BUILD (FEATURES/PROCESS) ================= */}

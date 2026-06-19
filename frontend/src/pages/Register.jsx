@@ -25,10 +25,13 @@ const Register = () => {
     try {
       const payload = { ...formData };
       await register(payload);
+      const searchParams = new URLSearchParams(window.location.search);
+      const redirect = searchParams.get('redirect');
+
       if (payload.role === 'Provider') {
         navigate('/provider/onboarding/select-service');
       } else {
-        navigate('/');
+        navigate(redirect || '/');
       }
     } catch (err) {
       // toast already handled in AuthContext

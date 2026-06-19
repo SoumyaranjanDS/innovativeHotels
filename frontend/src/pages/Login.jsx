@@ -21,6 +21,9 @@ const Login = () => {
     e.preventDefault();
     try {
       const user = await login(formData.email, formData.password);
+      const searchParams = new URLSearchParams(window.location.search);
+      const redirect = searchParams.get('redirect');
+
       if (user.role === 'Admin') {
         navigate('/admin/dashboard');
       } else if (user.role === 'Provider') {
@@ -30,7 +33,7 @@ const Login = () => {
           navigate('/provider/dashboard');
         }
       } else {
-        navigate('/');
+        navigate(redirect || '/');
       }
     } catch (err) {
       // toast already handled in AuthContext

@@ -18,7 +18,7 @@ const AccordionItem = ({ question, answer, isOpen, onClick }) => {
         onClick={onClick}
       >
         <span className="font-heading text-xl text-[#2C2C2C]">{question}</span>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isOpen ? 'bg-accent text-white' : 'bg-[#F3F1EB] text-gray-500'}`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isOpen ? 'bg-accent text-white' : 'bg-[#e8f1f8] text-gray-500'}`}>
           <ChevronDown size={16} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
         </div>
       </button>
@@ -87,7 +87,7 @@ const TestimonialSection = () => {
   };
 
   return (
-    <section className="bg-[#1E2418] py-24 overflow-hidden border-y border-white/5">
+    <section className="bg-[#0A192F] py-24 overflow-hidden border-y border-white/5">
       <style>
         {`
           @keyframes scroll {
@@ -112,7 +112,7 @@ const TestimonialSection = () => {
       
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12 mb-16 text-center">
         <h2 className="text-4xl md:text-5xl font-heading text-white mb-4">What Our Clients Say</h2>
-        <p className="font-script text-2xl text-[#8A9A74]">Join thousands of happy travelers.</p>
+        <p className="font-script text-2xl text-[#16537e]">Join thousands of happy travelers.</p>
       </div>
 
       <div 
@@ -122,12 +122,12 @@ const TestimonialSection = () => {
         {/* Top Row - Scrolls Left */}
         <div className="flex gap-8 w-max animate-scroll pause-on-hover px-4">
           {row1.map((t, i) => (
-            <div key={i} className="w-[320px] md:w-[400px] shrink-0 bg-[#2C3524] border border-white/10 shadow-sm rounded-2xl p-6 hover:bg-[#3A452F] transition-colors">
+            <div key={i} className="w-[320px] md:w-[400px] shrink-0 bg-[#112240] border border-white/10 shadow-sm rounded-2xl p-6 hover:bg-[#233554] transition-colors">
               <div className="flex items-center gap-4 mb-4">
                 <img src={t.img} alt={t.name} className="w-12 h-12 rounded-full object-cover border border-white/20" />
                 <div>
                   <h4 className="text-white text-sm font-semibold">{t.name}</h4>
-                  <span className="text-[#F3F1EB]/80 text-xs">{t.role}</span>
+                  <span className="text-[#e8f1f8]/80 text-xs">{t.role}</span>
                 </div>
               </div>
               <div className="h-px bg-white/20 w-full mb-4"></div>
@@ -143,12 +143,12 @@ const TestimonialSection = () => {
         {/* Bottom Row - Scrolls Right */}
         <div className="flex gap-8 w-max animate-scroll-reverse pause-on-hover px-4">
           {row2.map((t, i) => (
-            <div key={i} className="w-[320px] md:w-[400px] shrink-0 bg-[#2C3524] border border-white/10 shadow-sm rounded-2xl p-6 hover:bg-[#3A452F] transition-colors">
+            <div key={i} className="w-[320px] md:w-[400px] shrink-0 bg-[#112240] border border-white/10 shadow-sm rounded-2xl p-6 hover:bg-[#233554] transition-colors">
               <div className="flex items-center gap-4 mb-4">
                 <img src={t.img} alt={t.name} className="w-12 h-12 rounded-full object-cover border border-white/20" />
                 <div>
                   <h4 className="text-white text-sm font-semibold">{t.name}</h4>
-                  <span className="text-[#F3F1EB]/80 text-xs">{t.role}</span>
+                  <span className="text-[#e8f1f8]/80 text-xs">{t.role}</span>
                 </div>
               </div>
               <div className="h-px bg-white/20 w-full mb-4"></div>
@@ -277,10 +277,10 @@ const Home = () => {
                 if (!user) navigate('/login');
                 else setShowSearchModal(true);
               }}
-              className="group flex items-center bg-[#8A9A74] hover:bg-[#788863] text-white rounded-full pl-6 pr-2 py-2 font-medium text-sm transition-colors mb-16 shadow-lg shadow-[#8A9A74]/30"
+              className="group flex items-center bg-[#16537e] hover:bg-[#2072ab] text-white rounded-full pl-6 pr-2 py-2 font-medium text-sm transition-colors mb-16 shadow-lg shadow-[#16537e]/30"
             >
               Check Availability
-              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center ml-4 text-[#8A9A74] group-hover:bg-[#F3F1EB] transition-colors">
+              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center ml-4 text-[#16537e] group-hover:bg-[#e8f1f8] transition-colors">
                 <ArrowRight size={16} />
               </div>
             </motion.button>
@@ -308,7 +308,7 @@ const Home = () => {
             {/* Main large image */}
             <motion.div 
               initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.8, delay: 0.2 }}
-              className="absolute right-0 xl:right-4 top-0 w-[320px] xl:w-[400px] h-[420px] xl:h-[540px] rounded-[30px] xl:rounded-[40px] overflow-hidden shadow-2xl shadow-[#8A9A74]/20 border-[8px] xl:border-[10px] border-white z-10"
+              className="absolute right-0 xl:right-4 top-0 w-[320px] xl:w-[400px] h-[420px] xl:h-[540px] rounded-[30px] xl:rounded-[40px] overflow-hidden shadow-2xl shadow-[#16537e]/20 border-[8px] xl:border-[10px] border-white z-10"
             >
               <img src="/images/hero1.png" alt="Luxury Hotel" className="w-full h-full object-cover object-center" />
             </motion.div>
@@ -316,7 +316,7 @@ const Home = () => {
             {/* Secondary offset image */}
             <motion.div 
               initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.8, delay: 0.4 }}
-              className="absolute left-4 xl:left-8 bottom-0 xl:bottom-8 w-[220px] xl:w-[280px] h-[280px] xl:h-[360px] rounded-[24px] xl:rounded-[30px] overflow-hidden shadow-2xl shadow-[#8A9A74]/15 border-[6px] xl:border-[8px] border-white z-20"
+              className="absolute left-4 xl:left-8 bottom-0 xl:bottom-8 w-[220px] xl:w-[280px] h-[280px] xl:h-[360px] rounded-[24px] xl:rounded-[30px] overflow-hidden shadow-2xl shadow-[#16537e]/15 border-[6px] xl:border-[8px] border-white z-20"
             >
               <img src="/images/hero2.png" alt="Premium Cab" className="w-full h-full object-cover object-center" />
             </motion.div>
@@ -348,7 +348,7 @@ const Home = () => {
               We build experiences you want to return to
             </h2>
             
-            <p className="font-script text-2xl text-[#8A9A74] mb-8">
+            <p className="font-script text-2xl text-[#16537e] mb-8">
               comfort, style, and complete peace of mind
             </p>
 
@@ -357,13 +357,13 @@ const Home = () => {
             </p>
 
             <div className="flex items-center gap-6">
-              <Link to="/about" className="bg-[#8A9A74] hover:bg-[#788863] text-white rounded-full px-6 py-3 font-medium text-sm transition-colors shadow-md flex items-center gap-3">
+              <Link to="/about" className="bg-[#16537e] hover:bg-[#2072ab] text-white rounded-full px-6 py-3 font-medium text-sm transition-colors shadow-md flex items-center gap-3">
                 About company <ArrowRight size={14} />
               </Link>
             </div>
 
-            <div className="mt-16 bg-[#F3F1EB] rounded-2xl p-6 flex items-center gap-4 max-w-sm">
-              <div className="text-[#8A9A74]">
+            <div className="mt-16 bg-[#e8f1f8] rounded-2xl p-6 flex items-center gap-4 max-w-sm">
+              <div className="text-[#16537e]">
                 <ShieldCheck size={28} />
               </div>
               <div>
@@ -381,9 +381,9 @@ const Home = () => {
               { title: "Quality control", desc: "Technical supervision at every stage and multi-stage quality checks.", img: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500&q=80" },
               { title: "Energy efficient", desc: "Modern premium fleet reduces fuel consumption and increases comfort.", img: "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=500&q=80" }
             ].map((item, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }} className="bg-[#F3F1EB] rounded-2xl md:rounded-3xl overflow-hidden flex flex-col h-56 md:h-72 group relative">
+              <motion.div key={i} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }} className="bg-[#e8f1f8] rounded-2xl md:rounded-3xl overflow-hidden flex flex-col h-56 md:h-72 group relative">
                 <div className="p-4 md:p-8 pb-2 md:pb-4 flex-1">
-                  <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-lg md:rounded-xl shadow-sm flex items-center justify-center text-[#8A9A74] mb-3 md:mb-4 shrink-0">
+                  <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-lg md:rounded-xl shadow-sm flex items-center justify-center text-[#16537e] mb-3 md:mb-4 shrink-0">
                     <CheckCircle2 size={16} className="hidden md:block" />
                     <CheckCircle2 size={14} className="block md:hidden" />
                   </div>
@@ -392,7 +392,7 @@ const Home = () => {
                 </div>
                 <div className="h-16 md:h-24 w-full relative overflow-hidden mt-auto">
                   <img src={item.img} alt={item.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-500" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#F3F1EB]/10 to-[#F3F1EB]"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#e8f1f8]/10 to-[#e8f1f8]"></div>
                 </div>
               </motion.div>
             ))}
@@ -413,8 +413,8 @@ const Home = () => {
               Hotels brought <br/>to life
             </h2>
           </div>
-          <Link to="/hotels" className="text-sm font-medium text-gray-500 hover:text-[#8A9A74] transition-colors flex items-center gap-2 group">
-            All projects <div className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center group-hover:border-[#8A9A74] transition-colors"><ArrowRight size={14} /></div>
+          <Link to="/hotels" className="text-sm font-medium text-gray-500 hover:text-[#16537e] transition-colors flex items-center gap-2 group">
+            All projects <div className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center group-hover:border-[#16537e] transition-colors"><ArrowRight size={14} /></div>
           </Link>
         </div>
 
@@ -430,7 +430,7 @@ const Home = () => {
                   <div className="relative h-64 overflow-hidden rounded-t-3xl rounded-b-xl m-2">
                     <img src={hotel.photos?.[0] || `https://images.unsplash.com/photo-1566073771259-6a8506099945`} alt={hotel.hotelName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                     <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-[#2C2C2C] flex items-center gap-2">
-                      <Building2 size={12} className="text-[#8A9A74]"/> 120m²
+                      <Building2 size={12} className="text-[#16537e]"/> 120m²
                     </div>
                   </div>
                   <div className="p-6 flex-1 flex flex-col">
@@ -441,8 +441,8 @@ const Home = () => {
                     
                     <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-4">
                       <span className="text-gray-400 text-sm">from <strong className="text-[#2C2C2C]">₹{hotel.startingPrice || 4200}</strong></span>
-                      <Link to={`/hotels/${hotel._id}`} className="text-xs font-medium text-gray-500 hover:text-[#8A9A74] transition-colors flex items-center gap-2">
-                        Details <ArrowRight size={14} className="text-[#8A9A74]" />
+                      <Link to={`/hotels/${hotel._id}`} className="text-xs font-medium text-gray-500 hover:text-[#16537e] transition-colors flex items-center gap-2">
+                        Details <ArrowRight size={14} className="text-[#16537e]" />
                       </Link>
                     </div>
                   </div>
@@ -457,7 +457,7 @@ const Home = () => {
                   <button 
                     key={idx}
                     onClick={() => setCurrentSlide(idx)}
-                    className={`w-2.5 h-2.5 rounded-full transition-colors ${currentSlide === idx ? 'bg-[#8A9A74]' : 'bg-gray-300 hover:bg-gray-400'}`}
+                    className={`w-2.5 h-2.5 rounded-full transition-colors ${currentSlide === idx ? 'bg-[#16537e]' : 'bg-gray-300 hover:bg-gray-400'}`}
                   />
                 ))}
               </div>
@@ -479,7 +479,7 @@ const Home = () => {
             <h2 className="text-4xl font-heading text-[#2C2C2C] leading-tight">
               Transparent process <br/>from idea to stay
             </h2>
-            <p className="font-script text-2xl text-[#8A9A74] mt-4">smooth and hassle-free</p>
+            <p className="font-script text-2xl text-[#16537e] mt-4">smooth and hassle-free</p>
           </div>
 
           <div className="w-full lg:w-[70%] flex flex-col md:flex-row justify-between gap-6 relative">
@@ -493,9 +493,9 @@ const Home = () => {
               { num: "04", icon: Key, title: "Arrival", desc: "Final check and handing over the room keys." }
             ].map((step, i) => (
               <div key={i} className="flex flex-col items-center text-center relative z-10 w-full">
-                <div className="w-20 h-20 bg-[#F3F1EB] rounded-3xl flex flex-col items-center justify-center mb-6 shadow-sm border border-white">
+                <div className="w-20 h-20 bg-[#e8f1f8] rounded-3xl flex flex-col items-center justify-center mb-6 shadow-sm border border-white">
                   <span className="text-sm font-heading text-[#2C2C2C] font-bold mb-1">{step.num}</span>
-                  <div className="w-6 h-6 bg-[#8A9A74] rounded-lg flex items-center justify-center text-white shadow-sm">
+                  <div className="w-6 h-6 bg-[#16537e] rounded-lg flex items-center justify-center text-white shadow-sm">
                     <step.icon size={12} />
                   </div>
                 </div>
@@ -514,7 +514,7 @@ const Home = () => {
       <section className="max-w-4xl mx-auto px-6 lg:px-12 py-20">
         <div className="text-center mb-12">
           <h2 className="text-4xl font-heading text-[#2C2C2C] mb-4">Frequently Asked Questions</h2>
-          <p className="font-script text-2xl text-[#8A9A74]">everything you need to know</p>
+          <p className="font-script text-2xl text-[#16537e]">everything you need to know</p>
         </div>
         <div>
           {faqs.map((faq, i) => (
@@ -531,14 +531,14 @@ const Home = () => {
 
       {/* ================= FOOTER CTA ================= */}
       <section className="max-w-[1400px] mx-auto px-6 lg:px-12 pb-32">
-        <div className="relative w-full rounded-3xl overflow-hidden bg-[#F3F1EB] flex flex-col lg:flex-row min-h-[400px]">
+        <div className="relative w-full rounded-3xl overflow-hidden bg-[#e8f1f8] flex flex-col lg:flex-row min-h-[400px]">
           
           {/* Background Image spanning the right half */}
           <div className="absolute inset-0 w-full h-full z-0">
              <div className="w-full lg:w-1/2 h-full absolute right-0">
                <img src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80" alt="Lounge" className="w-full h-full object-cover" />
              </div>
-             <div className="absolute inset-0 bg-gradient-to-r from-[#F3F1EB] via-[#F3F1EB]/95 lg:via-[#F3F1EB] lg:to-transparent"></div>
+             <div className="absolute inset-0 bg-gradient-to-r from-[#e8f1f8] via-[#e8f1f8]/95 lg:via-[#e8f1f8] lg:to-transparent"></div>
           </div>
 
           <div className="relative z-10 w-full flex flex-col lg:flex-row justify-between p-12 lg:p-20">
@@ -548,7 +548,7 @@ const Home = () => {
               <h2 className="text-4xl md:text-5xl font-heading text-[#2C2C2C] leading-tight mb-6">
                 Let's plan your<br/>ideal journey
               </h2>
-              <p className="font-script text-2xl text-[#8A9A74] mb-8">memories wait for you</p>
+              <p className="font-script text-2xl text-[#16537e] mb-8">memories wait for you</p>
               
               <p className="text-gray-500 text-sm leading-relaxed mb-10">
                 Leave a request — we will contact you, tell you about the possibilities and select the best solution.
@@ -556,7 +556,7 @@ const Home = () => {
               
               <button 
                 onClick={() => setShowSearchModal(true)}
-                className="bg-[#8A9A74] hover:bg-[#788863] text-white rounded-full px-8 py-4 font-medium text-sm transition-colors shadow-lg flex items-center gap-3 w-max"
+                className="bg-[#16537e] hover:bg-[#2072ab] text-white rounded-full px-8 py-4 font-medium text-sm transition-colors shadow-lg flex items-center gap-3 w-max"
               >
                 Get consultation <ArrowRight size={16} />
               </button>
@@ -565,7 +565,7 @@ const Home = () => {
             {/* Right Contact Cards */}
             <div className="w-full lg:w-1/2 flex flex-col justify-center items-end gap-4 mt-12 lg:mt-0">
                <div className="bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-6 w-full max-w-sm">
-                 <div className="w-12 h-12 bg-[#F3F1EB] rounded-full flex items-center justify-center text-[#8A9A74]">
+                 <div className="w-12 h-12 bg-[#e8f1f8] rounded-full flex items-center justify-center text-[#16537e]">
                    <Phone size={20} />
                  </div>
                  <div>
@@ -575,7 +575,7 @@ const Home = () => {
                </div>
 
                <div className="bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-6 w-full max-w-sm">
-                 <div className="w-12 h-12 bg-[#F3F1EB] rounded-full flex items-center justify-center text-[#8A9A74]">
+                 <div className="w-12 h-12 bg-[#e8f1f8] rounded-full flex items-center justify-center text-[#16537e]">
                    <Mail size={20} />
                  </div>
                  <div>
@@ -590,13 +590,13 @@ const Home = () => {
         {/* Footer Links Mini */}
         <div className="flex flex-col md:flex-row justify-between items-center mt-12 text-xs text-gray-400">
            <div className="flex items-center gap-2 font-heading text-lg text-[#2C2C2C] mb-4 md:mb-0">
-             <Crown className="text-[#8A9A74]" size={20} /> INNO
+             <Crown className="text-[#16537e]" size={20} /> INNO
            </div>
            <div className="flex gap-8 mb-4 md:mb-0">
-             <Link to="/about" className="hover:text-[#8A9A74]">About</Link>
-             <Link to="/features" className="hover:text-[#8A9A74]">Features</Link>
-             <Link to="/faq" className="hover:text-[#8A9A74]">FAQ</Link>
-             <Link to="/contact" className="hover:text-[#8A9A74]">Contacts</Link>
+             <Link to="/about" className="hover:text-[#16537e]">About</Link>
+             <Link to="/features" className="hover:text-[#16537e]">Features</Link>
+             <Link to="/faq" className="hover:text-[#16537e]">FAQ</Link>
+             <Link to="/contact" className="hover:text-[#16537e]">Contacts</Link>
            </div>
            <div>Privacy Policy</div>
         </div>
@@ -613,24 +613,24 @@ const Home = () => {
               initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
               className="bg-white w-full max-w-4xl p-10 relative shadow-2xl rounded-[40px] overflow-hidden"
             >
-              <button onClick={() => setShowSearchModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-[#F3F1EB] rounded-full flex items-center justify-center text-gray-500 hover:text-[#2C2C2C] transition-colors">
+              <button onClick={() => setShowSearchModal(false)} className="absolute top-6 right-6 w-10 h-10 bg-[#e8f1f8] rounded-full flex items-center justify-center text-gray-500 hover:text-[#2C2C2C] transition-colors">
                 <X size={20} />
               </button>
 
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-heading text-[#2C2C2C] mb-2">Start Your Journey</h2>
-                <p className="font-script text-xl text-[#8A9A74]">select your preferences</p>
+                <p className="font-script text-xl text-[#16537e]">select your preferences</p>
               </div>
 
               {/* Tabs */}
               <div className="flex justify-center gap-8 mb-10 border-b border-gray-100 pb-4">
-                <button onClick={() => setActiveTab('hotels')} className={`text-sm font-bold transition-all relative px-4 ${activeTab === 'hotels' ? 'text-[#8A9A74]' : 'text-gray-400 hover:text-gray-600'}`}>
+                <button onClick={() => setActiveTab('hotels')} className={`text-sm font-bold transition-all relative px-4 ${activeTab === 'hotels' ? 'text-[#16537e]' : 'text-gray-400 hover:text-gray-600'}`}>
                   Book A Stay
-                  {activeTab === 'hotels' && <motion.div layoutId="searchTab" className="absolute -bottom-[17px] left-0 right-0 h-0.5 bg-[#8A9A74]" />}
+                  {activeTab === 'hotels' && <motion.div layoutId="searchTab" className="absolute -bottom-[17px] left-0 right-0 h-0.5 bg-[#16537e]" />}
                 </button>
-                <button onClick={() => setActiveTab('cabs')} className={`text-sm font-bold transition-all relative px-4 ${activeTab === 'cabs' ? 'text-[#8A9A74]' : 'text-gray-400 hover:text-gray-600'}`}>
+                <button onClick={() => setActiveTab('cabs')} className={`text-sm font-bold transition-all relative px-4 ${activeTab === 'cabs' ? 'text-[#16537e]' : 'text-gray-400 hover:text-gray-600'}`}>
                   Book A Ride
-                  {activeTab === 'cabs' && <motion.div layoutId="searchTab" className="absolute -bottom-[17px] left-0 right-0 h-0.5 bg-[#8A9A74]" />}
+                  {activeTab === 'cabs' && <motion.div layoutId="searchTab" className="absolute -bottom-[17px] left-0 right-0 h-0.5 bg-[#16537e]" />}
                 </button>
               </div>
 
@@ -640,8 +640,8 @@ const Home = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-500 mb-2">Destination</label>
-                      <div className="relative bg-[#F3F1EB] rounded-2xl px-4 py-3 flex items-center focus-within:ring-2 ring-[#8A9A74]/30 transition-all">
-                        <MapPin size={18} className="text-[#8A9A74] mr-3" />
+                      <div className="relative bg-[#e8f1f8] rounded-2xl px-4 py-3 flex items-center focus-within:ring-2 ring-[#16537e]/30 transition-all">
+                        <MapPin size={18} className="text-[#16537e] mr-3" />
                         {isLoaded ? (
                           <Autocomplete onLoad={(auto) => (autocompleteRef.current = auto)} onPlaceChanged={handlePlaceChanged} options={{ types: ['(cities)'] }}>
                             <input type="text" placeholder="City or Hotel Name" value={hotelSearch.destination} onChange={(e) => setHotelSearch({ ...hotelSearch, destination: e.target.value })} className="w-full bg-transparent text-[#2C2C2C] placeholder-gray-400 outline-none font-medium" />
@@ -653,14 +653,14 @@ const Home = () => {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-2">Check-in</label>
-                      <input type="date" min={today} value={hotelSearch.checkIn} onChange={(e) => setHotelSearch({ ...hotelSearch, checkIn: e.target.value })} className="w-full bg-[#F3F1EB] rounded-2xl px-4 py-3 text-[#2C2C2C] outline-none font-medium focus:ring-2 ring-[#8A9A74]/30 transition-all" />
+                      <input type="date" min={today} value={hotelSearch.checkIn} onChange={(e) => setHotelSearch({ ...hotelSearch, checkIn: e.target.value })} className="w-full bg-[#e8f1f8] rounded-2xl px-4 py-3 text-[#2C2C2C] outline-none font-medium focus:ring-2 ring-[#16537e]/30 transition-all" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-2">Check-out</label>
-                      <input type="date" min={hotelSearch.checkIn || today} value={hotelSearch.checkOut} onChange={(e) => setHotelSearch({ ...hotelSearch, checkOut: e.target.value })} className="w-full bg-[#F3F1EB] rounded-2xl px-4 py-3 text-[#2C2C2C] outline-none font-medium focus:ring-2 ring-[#8A9A74]/30 transition-all" />
+                      <input type="date" min={hotelSearch.checkIn || today} value={hotelSearch.checkOut} onChange={(e) => setHotelSearch({ ...hotelSearch, checkOut: e.target.value })} className="w-full bg-[#e8f1f8] rounded-2xl px-4 py-3 text-[#2C2C2C] outline-none font-medium focus:ring-2 ring-[#16537e]/30 transition-all" />
                     </div>
                     <div className="md:col-span-2 flex justify-center mt-6">
-                      <button onClick={handleHotelSearch} className="px-10 py-4 bg-[#8A9A74] hover:bg-[#788863] text-white rounded-full font-bold shadow-lg shadow-[#8A9A74]/30 transition-colors flex items-center gap-3">
+                      <button onClick={handleHotelSearch} className="px-10 py-4 bg-[#16537e] hover:bg-[#2072ab] text-white rounded-full font-bold shadow-lg shadow-[#16537e]/30 transition-colors flex items-center gap-3">
                         Check Availability <ArrowRight size={18} />
                       </button>
                     </div>
@@ -669,8 +669,8 @@ const Home = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-2">Pickup Location</label>
-                      <div className="relative bg-[#F3F1EB] rounded-2xl px-4 py-3 flex items-center focus-within:ring-2 ring-[#8A9A74]/30 transition-all">
-                        <MapPin size={18} className="text-[#8A9A74] mr-3" />
+                      <div className="relative bg-[#e8f1f8] rounded-2xl px-4 py-3 flex items-center focus-within:ring-2 ring-[#16537e]/30 transition-all">
+                        <MapPin size={18} className="text-[#16537e] mr-3" />
                         {isLoaded ? (
                           <Autocomplete onLoad={(auto) => (cabPickupRef.current = auto)} onPlaceChanged={() => handleCabPlaceChanged(cabPickupRef, 'pickup')}>
                             <input type="text" placeholder="Where from?" className="w-full bg-transparent text-[#2C2C2C] placeholder-gray-400 outline-none font-medium" />
@@ -682,8 +682,8 @@ const Home = () => {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-2">Drop Location</label>
-                      <div className="relative bg-[#F3F1EB] rounded-2xl px-4 py-3 flex items-center focus-within:ring-2 ring-[#8A9A74]/30 transition-all">
-                        <Navigation size={18} className="text-[#8A9A74] mr-3" />
+                      <div className="relative bg-[#e8f1f8] rounded-2xl px-4 py-3 flex items-center focus-within:ring-2 ring-[#16537e]/30 transition-all">
+                        <Navigation size={18} className="text-[#16537e] mr-3" />
                         {isLoaded ? (
                           <Autocomplete onLoad={(auto) => (cabDropRef.current = auto)} onPlaceChanged={() => handleCabPlaceChanged(cabDropRef, 'drop')}>
                             <input type="text" placeholder="Where to?" className="w-full bg-transparent text-[#2C2C2C] placeholder-gray-400 outline-none font-medium" />
@@ -694,7 +694,7 @@ const Home = () => {
                       </div>
                     </div>
                     <div className="md:col-span-2 flex justify-center mt-6">
-                      <button onClick={handleCabSearchSubmit} className="px-10 py-4 bg-[#8A9A74] hover:bg-[#788863] text-white rounded-full font-bold shadow-lg shadow-[#8A9A74]/30 transition-colors flex items-center gap-3">
+                      <button onClick={handleCabSearchSubmit} className="px-10 py-4 bg-[#16537e] hover:bg-[#2072ab] text-white rounded-full font-bold shadow-lg shadow-[#16537e]/30 transition-colors flex items-center gap-3">
                         Find Rides <Car size={18} />
                       </button>
                     </div>

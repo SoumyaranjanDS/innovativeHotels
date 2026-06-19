@@ -287,7 +287,7 @@ const HotelDetailPage = () => {
                             onClick={() => handleSelectRoom(room)}
                             className={`mt-4 w-full px-6 py-3 rounded-xl font-bold text-sm transition ${
                               room.available
-                                ? 'bg-green-400 text-gray-900 hover:bg-green-500 shadow-md' 
+                                ? 'bg-primary text-white hover:bg-primary-light shadow-md' 
                                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                             }`}
                           >

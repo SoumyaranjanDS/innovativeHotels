@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
 import { MapPin, Star, ShieldCheck, Users, BedDouble, Wind, ChevronLeft, ChevronRight, Clock, AlertCircle } from 'lucide-react';
@@ -62,6 +62,7 @@ const HotelDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedPhoto, setSelectedPhoto] = useState(0);
   const [checkingRoom, setCheckingRoom] = useState(null);
+  const [activeDoc, setActiveDoc] = useState(null);
 
   useEffect(() => {
     const fetchHotel = async () => {
@@ -144,7 +145,7 @@ const HotelDetailPage = () => {
       {/* Photo Gallery */}
       <div className="relative h-[50vh] bg-gray-900 overflow-hidden">
         <img src={photos[selectedPhoto]} alt={hotel.hotelName} className="w-full h-full object-cover opacity-90" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20"></div>
+        <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-black/20"></div>
 
         {photos.length > 1 && (
           <>
@@ -242,7 +243,7 @@ const HotelDetailPage = () => {
                     <motion.div key={room._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
                       <div className="flex flex-col md:flex-row">
                         {/* Room Image */}
-                        <div className="md:w-56 h-44 md:h-auto flex-shrink-0">
+                        <div className="md:w-56 h-44 md:h-auto shrink-0">
                           <RoomPhotoSlider photos={room.roomPhotos} altText={room.roomType} />
                         </div>
 
@@ -271,7 +272,7 @@ const HotelDetailPage = () => {
                         </div>
 
                         {/* Price & Action */}
-                        <div className="p-6 flex flex-col justify-between items-end border-t md:border-t-0 md:border-l border-gray-100 md:w-52">
+                        <div className="p-6 flex flex-col justify-between items-end border-t md:border-t-0 md:border-l border-gray-100 md:w-56">
                           <div className="text-right">
                             <p className="text-2xl font-bold text-black">₹{(room.pricePerNight || room.price).toLocaleString()}</p>
                             <p className="text-xs text-gray-400">per night</p>
@@ -282,17 +283,20 @@ const HotelDetailPage = () => {
                             )}
                             {room.taxPercent > 0 && <p className="text-xs text-gray-400">+{room.taxPercent}% tax</p>}
                           </div>
-                          <button
-                            disabled={!room.available || checkingRoom === room._id}
-                            onClick={() => handleSelectRoom(room)}
-                            className={`mt-4 w-full px-6 py-3 rounded-xl font-bold text-sm transition ${
-                              room.available
-                                ? 'bg-primary text-white hover:bg-primary-light shadow-md' 
-                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            }`}
-                          >
-                            {checkingRoom === room._id ? 'Checking...' : room.available ? 'Select Room' : 'Sold Out'}
-                          </button>
+                          <div className="w-full mt-4 text-right">
+                            <p className="text-[10px] text-gray-500 mb-1 leading-tight text-center">By selecting a room you agree to our conditions. Check below before selecting rooms.</p>
+                            <button
+                              disabled={!room.available || checkingRoom === room._id}
+                              onClick={() => handleSelectRoom(room)}
+                              className={`w-full px-6 py-3 rounded-xl font-bold text-sm transition ${
+                                room.available
+                                  ? 'bg-primary text-white hover:bg-primary-light shadow-md' 
+                                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              }`}
+                            >
+                              {checkingRoom === room._id ? 'Checking...' : room.available ? 'Select Room' : 'Sold Out'}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -312,16 +316,43 @@ const HotelDetailPage = () => {
               </div>
             )}
 
-            {/* Policies */}
-            {hotel.policies && Object.keys(hotel.policies).some(k => hotel.policies[k]) && (
+            {/* Legal Documents */}
+            {hotel.policies && (hotel.policies.termsAndConditions || hotel.policies.privacyPolicy || hotel.policies.refundPolicy) && (
               <div>
-                <h2 className="text-2xl font-heading font-bold text-gray-900 mb-4">Hotel Policies</h2>
-                <div className="bg-gray-50 rounded-xl p-6 space-y-3">
-                  {hotel.policies.cancellation && <div><span className="font-semibold text-gray-700">Cancellation:</span> <span className="text-gray-600">{hotel.policies.cancellation}</span></div>}
-                  {hotel.policies.refundRules && <div><span className="font-semibold text-gray-700">Refund Rules:</span> <span className="text-gray-600">{hotel.policies.refundRules}</span></div>}
-                  {hotel.policies.childPolicy && <div><span className="font-semibold text-gray-700">Child Policy:</span> <span className="text-gray-600">{hotel.policies.childPolicy}</span></div>}
-                  {hotel.policies.idProofRequired && <div><span className="font-semibold text-gray-700">ID Proof:</span> <span className="text-gray-600">{hotel.policies.idProofRequired}</span></div>}
-                  {hotel.policies.petSmokingRules && <div><span className="font-semibold text-gray-700">Pet & Smoking:</span> <span className="text-gray-600">{hotel.policies.petSmokingRules}</span></div>}
+                <h2 className="text-2xl font-heading font-bold text-gray-900 mb-4">Legal & Documents</h2>
+                <div className="space-y-3">
+                  {[
+                    { id: 'terms', title: 'Terms and Conditions', content: hotel.policies.termsAndConditions },
+                    { id: 'privacy', title: 'Privacy Policy', content: hotel.policies.privacyPolicy },
+                    { id: 'refund', title: 'Refund Policy', content: hotel.policies.refundPolicy }
+                  ].filter(d => d.content).map(doc => (
+                    <div key={doc.id} className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                      <button
+                        onClick={() => setActiveDoc(activeDoc === doc.id ? null : doc.id)}
+                        className="w-full flex justify-between items-center p-5 font-bold text-white bg-primary hover:bg-primary-dark transition-colors"
+                      >
+                        <span>{doc.title}</span>
+                        <span className={`transition-transform duration-300 ${activeDoc === doc.id ? 'rotate-180' : ''}`}>
+                          <svg fill="none" height="24" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                        </span>
+                      </button>
+                      <AnimatePresence>
+                        {activeDoc === doc.id && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                          >
+                            <div className="p-5 text-gray-700 bg-gray-50 border-t border-gray-200 text-sm leading-relaxed whitespace-pre-wrap">
+                              {doc.content}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -355,7 +386,7 @@ const HotelDetailPage = () => {
           </div>
 
           {/* Sticky Sidebar */}
-          <div className="lg:w-80 flex-shrink-0">
+          <div className="lg:w-80 shrink-0">
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 sticky top-8">
               <h3 className="font-bold text-gray-800 text-lg mb-4">Your Stay</h3>
               <div className="mb-6 space-y-3">

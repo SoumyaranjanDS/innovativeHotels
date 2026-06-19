@@ -27,7 +27,10 @@ const hotelSchema = new mongoose.Schema({
     refundRules: String,
     childPolicy: String,
     idProofRequired: String,
-    petSmokingRules: String
+    petSmokingRules: String,
+    termsAndConditions: String,
+    privacyPolicy: String,
+    refundPolicy: String
   },
   documents: {
     ownerIdProof: String,

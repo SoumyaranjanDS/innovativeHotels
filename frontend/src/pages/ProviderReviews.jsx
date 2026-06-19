@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { Star, MessageSquare } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 const ProviderReviews = () => {
   const [reviews, setReviews] = useState([]);
@@ -9,10 +10,12 @@ const ProviderReviews = () => {
   useEffect(() => {
     const fetchReviews = async () => {
       try {
-        const res = await api.get('/provider/reviews');
-        setReviews(res.data.reviews || []);
-      } catch (error) {
-        console.error("Failed to fetch reviews", error);
+        const res = await api.get('/providers/reviews');
+        if (res.data.success) {
+          setReviews(res.data.reviews);
+        }
+      } catch (err) {
+        toast.error('Failed to load reviews');
       } finally {
         setLoading(false);
       }
@@ -20,54 +23,52 @@ const ProviderReviews = () => {
     fetchReviews();
   }, []);
 
-  if (loading) return <div className="p-8 text-center">Loading reviews...</div>;
+  if (loading) {
+    return <div className="flex justify-center py-12"><div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div></div>;
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="flex justify-between items-end">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Customer Reviews</h1>
-          <p className="text-gray-500">Read what guests are saying about your properties.</p>
-        </div>
-        <div className="bg-primary/10 text-primary px-4 py-2 rounded-xl font-semibold flex items-center gap-2">
-          <Star size={18} />
-          {reviews.length} Reviews
+          <h1 className="text-2xl font-bold text-gray-900 font-heading">Customer Reviews</h1>
+          <p className="text-gray-500 mt-1">See what your guests are saying about their stay</p>
         </div>
       </div>
 
       {reviews.length === 0 ? (
-        <div className="bg-white p-12 text-center rounded-2xl shadow-sm border border-gray-100">
-          <MessageSquare size={48} className="mx-auto text-gray-300 mb-4" />
-          <h2 className="text-xl font-bold text-gray-800 mb-2">No Reviews Yet</h2>
-          <p className="text-gray-500">You haven't received any reviews yet. Provide great service to get your first 5-star review!</p>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 flex flex-col items-center justify-center text-center">
+          <MessageSquare size={48} className="text-gray-300 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-700">No reviews yet</h3>
+          <p className="text-gray-500 max-w-md mt-2">When customers leave reviews for your hotel, they will appear here.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {reviews.map(review => (
-            <div key={review._id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold">
-                    {review.userId?.name?.charAt(0) || 'G'}
+          {reviews.map((review) => (
+            <div key={review._id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
+                      {review.userId?.name?.charAt(0)?.toUpperCase() || 'G'}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">{review.userId?.name || 'Guest'}</p>
+                      <p className="text-xs text-gray-500">{new Date(review.createdAt).toLocaleDateString()}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900">{review.userId?.name || 'Guest'}</h3>
-                    <p className="text-xs text-gray-500">{new Date(review.createdAt).toLocaleDateString()}</p>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star key={star} size={16} className={star <= review.rating ? "text-accent fill-accent" : "text-gray-300"} />
+                    ))}
                   </div>
                 </div>
-                <div className="flex items-center bg-yellow-50 px-2 py-1 rounded text-yellow-700 font-bold text-sm">
-                  <Star size={14} className="fill-current mr-1" />
-                  {review.rating}.0
-                </div>
-              </div>
-              
-              <div className="mb-4">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Property</p>
-                <p className="text-sm text-indigo-600 font-medium">{review.hotelId?.profile?.hotelName || 'N/A'}</p>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                <p className="text-gray-700 text-sm italic">"{review.comment}"</p>
+                {review.hotelId?.profile?.hotelName && (
+                  <p className="text-xs font-semibold text-primary mb-2">Hotel: {review.hotelId.profile.hotelName}</p>
+                )}
+                <p className="text-gray-700 text-sm leading-relaxed mb-4">
+                  "{review.comment}"
+                </p>
               </div>
             </div>
           ))}

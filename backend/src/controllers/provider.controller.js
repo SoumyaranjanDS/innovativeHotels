@@ -503,3 +503,29 @@ exports.getProviderReviews = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Update hotel policies and legal documents
+// @route   PUT /api/provider/hotel-policies
+exports.updateHotelPolicies = async (req, res) => {
+  try {
+    const hotel = await Hotel.findOne({ providerId: req.user.id });
+    if (!hotel) {
+      return res.status(404).json({ success: false, message: 'Hotel not found' });
+    }
+
+    const { termsAndConditions, privacyPolicy, refundPolicy } = req.body;
+
+    hotel.policies = {
+      ...hotel.policies,
+      termsAndConditions: termsAndConditions !== undefined ? termsAndConditions : hotel.policies.termsAndConditions,
+      privacyPolicy: privacyPolicy !== undefined ? privacyPolicy : hotel.policies.privacyPolicy,
+      refundPolicy: refundPolicy !== undefined ? refundPolicy : hotel.policies.refundPolicy
+    };
+
+    await hotel.save();
+
+    res.json({ success: true, message: 'Policies updated successfully', policies: hotel.policies });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

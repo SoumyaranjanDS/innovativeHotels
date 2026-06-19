@@ -81,7 +81,7 @@ const HotelListingPage = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Search Summary Bar */}
-      <div className="bg-[#FAF9F5] text-gray-900 py-6 pt-32 border-b border-gray-200">
+      <div className="bg-background text-gray-900 py-6 pt-32 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-heading font-bold mb-2">
             Hotels in {city || 'All Locations'}
@@ -98,7 +98,7 @@ const HotelListingPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Filters Sidebar */}
-          <div className="lg:w-64 flex-shrink-0">
+          <div className="lg:w-64 shrink-0">
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 sticky top-8">
               <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Filter size={16} /> Filters</h3>
 
@@ -149,7 +149,7 @@ const HotelListingPage = () => {
                     <Link to={buildDetailUrl(hotel._id)} className="block bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 group">
                       <div className="flex flex-col md:flex-row">
                         {/* Image */}
-                        <div className="md:w-72 h-56 md:h-auto relative overflow-hidden flex-shrink-0">
+                        <div className="md:w-72 h-56 md:h-auto relative overflow-hidden shrink-0">
                           <img src={hotel.photos?.[0] || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500&q=80'} alt={hotel.hotelName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                           {hotel.avgRating && (
                             <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-2.5 py-1 rounded-full flex items-center gap-1 text-sm font-bold">

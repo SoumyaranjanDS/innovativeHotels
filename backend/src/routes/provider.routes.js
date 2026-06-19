@@ -16,6 +16,7 @@ router.post('/cab-service', addCabService);
 router.get('/hotel', getProviderHotel);
 router.get('/hotel-bookings', getProviderHotelBookings);
 router.patch('/hotel-bookings/:id/status', updateHotelBookingStatus);
+router.put('/hotel-policies', require('../controllers/provider.controller').updateHotelPolicies);
 router.post('/rooms', addRoom);
 router.get('/rooms', getRooms);
 router.delete('/rooms/:id', require('../controllers/provider.controller').deleteRoom);

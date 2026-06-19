@@ -40,21 +40,26 @@ exports.getProviderMetrics = async (req, res) => {
     const Hotel = require('../models/Hotel');
     const CabVendor = require('../models/CabVendor');
 
-    let totalRevenue = 0;
+    let totalOnlineRevenue = 0;
+    let totalCodCollected = 0;
+    let totalPlatformOwed = 0;
     let activeBookings = 0;
     let pendingRequests = 0;
 
-    // We can fetch provider's hotel and cab vendor
+    // Fetch provider's hotel and ALL cab vendors (for agencies)
     const hotel = await Hotel.findOne({ providerId: req.user.id });
-    const cabVendor = await CabVendor.findOne({ providerId: req.user.id, cabSourceType: 'INDEPENDENT' });
+    const cabVendors = await CabVendor.find({ providerId: req.user.id });
 
     let queryOr = [];
     if (hotel) {
       queryOr.push({ 'hotelBooking.hotelId': hotel._id });
       queryOr.push({ 'cabBooking.hotelId': hotel._id });
     }
-    if (cabVendor) {
-      queryOr.push({ 'cabBooking.vendorId': cabVendor._id });
+    const vendorIds = cabVendors.map(v => v._id);
+    vendorIds.push(req.user.id); // Add the provider's own ID in case they completed rides directly
+    
+    if (vendorIds.length > 0) {
+      queryOr.push({ 'cabBooking.vendorId': { $in: vendorIds } });
     }
 
     if (queryOr.length > 0) {
@@ -62,24 +67,32 @@ exports.getProviderMetrics = async (req, res) => {
       
       bookings.forEach(b => {
         if (b.bookingType === 'HOTEL') {
-          if (b.hotelBooking.status === 'confirmed' || b.hotelBooking.status === 'checked_in') activeBookings++;
-          if (b.hotelBooking.status === 'pending') pendingRequests++;
-          if (b.paymentStatus === 'paid') totalRevenue += (b.partnerEarning || 0);
+          if (b.hotelBooking?.status === 'confirmed' || b.hotelBooking?.status === 'checked_in') activeBookings++;
+          if (b.hotelBooking?.status === 'pending') pendingRequests++;
         } else if (b.bookingType === 'CAB') {
-          if (b.cabBooking.status === 'assigned' || b.cabBooking.status === 'on_the_way' || b.cabBooking.status === 'trip_started') activeBookings++;
-          if (b.cabBooking.status === 'requested') pendingRequests++;
-          if (b.paymentStatus === 'paid' || b.paymentStatus === 'cod_collected') totalRevenue += (b.partnerEarning || 0);
+          if (b.cabBooking?.status === 'assigned' || b.cabBooking?.status === 'on_the_way' || b.cabBooking?.status === 'trip_started') activeBookings++;
+          if (b.cabBooking?.status === 'requested') pendingRequests++;
+        }
+
+        if (b.paymentStatus === 'paid') {
+          totalOnlineRevenue += (b.partnerEarning || 0);
+        } else if (b.paymentStatus === 'cod_collected') {
+          // They collected the full cash
+          totalCodCollected += (b.totalAmount || 0);
+          // They owe the platform the commission
+          totalPlatformOwed += (b.platformCommission || 0);
         }
       });
     }
 
-    // FOR TESTING
-    totalRevenue += 500000;
+    // FOR TESTING - Remove in production if not needed
 
     res.status(200).json({
       success: true,
       metrics: {
-        totalRevenue: totalRevenue.toFixed(2),
+        totalOnlineRevenue: totalOnlineRevenue.toFixed(2),
+        totalCodCollected: totalCodCollected.toFixed(2),
+        totalPlatformOwed: totalPlatformOwed.toFixed(2),
         activeBookings,
         pendingRequests
       }
@@ -434,6 +447,11 @@ exports.updateHotelBookingStatus = async (req, res) => {
       
       if (booking.hotelBooking.checkoutOtp && booking.hotelBooking.checkoutOtp !== req.body.otp) {
         return res.status(400).json({ success: false, message: 'Invalid Check-out OTP. Please verify with the customer.' });
+      }
+
+      if ((booking.paymentMode === 'pay_at_hotel' || booking.paymentMode === 'cod') && booking.paymentStatus === 'pending') {
+        booking.paymentStatus = 'cod_collected';
+        booking.codCollectedAt = new Date();
       }
 
       booking.hotelBooking.status = 'completed';

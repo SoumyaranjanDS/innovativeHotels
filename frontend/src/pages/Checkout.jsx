@@ -5,10 +5,16 @@ import api from '../api/axios';
 import { Clock, ShieldCheck, AlertCircle, MapPin, Navigation } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 const libraries = ['places'];
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-const Checkout = () => {
+const CheckoutForm = () => {
+  const stripe = useStripe();
+  const elements = useElements();
+
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -229,13 +235,56 @@ const Checkout = () => {
       return;
     }
 
+    if (paymentMode === 'online' && !stripe) {
+      toast.error('Stripe is not initialized');
+      return;
+    }
+
     setConfirming(true);
     try {
+      let paymentIntentId = null;
+
+      if (paymentMode === 'online') {
+        // 1. Create PaymentIntent
+        const intentRes = await api.post('/payments/create-intent', {
+          holdId: holdData._id,
+          needPickupCab,
+          cabFare: (needPickupCab === 'hotel' || needPickupCab === 'external') && cabConfirmed ? cabPrice : 0
+        });
+        
+        if (!intentRes.data.success) {
+          throw new Error('Failed to create payment intent');
+        }
+
+        const { clientSecret } = intentRes.data;
+
+        // 2. Confirm card payment
+        const cardElement = elements.getElement(CardElement);
+        const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: {
+            card: cardElement,
+            billing_details: {
+              name: guestDetails.fullName,
+              email: guestDetails.email,
+              phone: guestDetails.mobile,
+            },
+          },
+        });
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        paymentIntentId = paymentIntent.id;
+      }
+
+      // 3. Confirm Booking with hotel backend
       const res = await api.post('/hotels/confirm', {
         holdId: holdData._id,
         guestDetails,
         paymentMode,
         needPickupCab,
+        paymentIntentId
       });
       
       const hotelBookingId = res.data.booking._id;
@@ -253,7 +302,8 @@ const Checkout = () => {
           pickupDateTime: new Date(checkIn + 'T' + guestDetails.expectedArrivalTime).toISOString(),
           estimatedFare: cabPrice,
           estimatedDistance: cabDistance,
-          tripType: 'pickup_to_hotel'
+          tripType: 'pickup_to_hotel',
+          paymentMode
         }).catch(err => {
           console.error("Cab booking failed to trigger automatically:", err);
           toast.warning("Hotel booked, but Cab request failed. Please request from dashboard.");
@@ -263,7 +313,7 @@ const Checkout = () => {
       toast.success('Booking confirmed successfully!');
       navigate(`/hotel-booking/confirmation/${hotelBookingId}`);
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to confirm booking.';
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to confirm booking.';
       toast.error(errorMsg);
       if (errorMsg.toLowerCase().includes('hold') || errorMsg.toLowerCase().includes('expire') || errorMsg.toLowerCase().includes('active')) {
         const holdKey = `hotel_hold_${roomId}_${checkIn}_${checkOut}`;
@@ -526,9 +576,30 @@ const Checkout = () => {
                   <input type="radio" name="payment" value="online" checked={paymentMode === 'online'} onChange={() => setPaymentMode('online')} className="w-4 h-4 text-primary focus:ring-primary" />
                   <div className="ml-3">
                     <span className="font-semibold text-gray-800">Pay Online</span>
-                    <p className="text-xs text-gray-500">Secure mock payment · Instant confirmation</p>
+                    <p className="text-xs text-gray-500">Pay securely with Stripe</p>
                   </div>
                 </label>
+                {paymentMode === 'online' && (
+                  <div className="p-4 border rounded-xl bg-gray-50 mt-2 border-gray-200 shadow-inner">
+                    <p className="text-sm text-gray-700 font-medium mb-3">Card Details</p>
+                    <div className="bg-white p-3 border rounded border-gray-300">
+                      <CardElement options={{
+                        style: {
+                          base: {
+                            fontSize: '16px',
+                            color: '#424770',
+                            '::placeholder': {
+                              color: '#aab7c4',
+                            },
+                          },
+                          invalid: {
+                            color: '#9e2146',
+                          },
+                        },
+                      }}/>
+                    </div>
+                  </div>
+                )}
                 <label className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition ${paymentMode === 'pay_at_hotel' ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`}>
                   <input type="radio" name="payment" value="pay_at_hotel" checked={paymentMode === 'pay_at_hotel'} onChange={() => setPaymentMode('pay_at_hotel')} className="w-4 h-4 text-primary focus:ring-primary" />
                   <div className="ml-3">
@@ -603,6 +674,14 @@ const Checkout = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+const Checkout = () => {
+  return (
+    <Elements stripe={stripePromise}>
+      <CheckoutForm />
+    </Elements>
   );
 };
 

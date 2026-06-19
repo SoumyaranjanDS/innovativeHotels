@@ -416,7 +416,7 @@ exports.confirmBooking = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { holdId, guestDetails, paymentMode, needPickupCab, couponCode } = req.body;
+    const { holdId, guestDetails, paymentMode, needPickupCab, couponCode, paymentIntentId } = req.body;
 
     const hold = await BookingHold.findById(holdId).session(session);
     if (!hold) throw new Error('Hold record not found');
@@ -428,7 +428,14 @@ exports.confirmBooking = async (req, res) => {
     let hotelStatus = 'payment_pending';
 
     if (paymentMode === 'online') {
-      // Mock payment simulation - always succeeds
+      if (!paymentIntentId) throw new Error('Payment Intent ID is required for online payments.');
+      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      if (paymentIntent.status !== 'succeeded') {
+        throw new Error('Payment was not successful. Please try again.');
+      }
+      
       paymentStatus = 'paid';
       hotelStatus = 'pending_approval';
     } else if (paymentMode === 'pay_at_hotel') {

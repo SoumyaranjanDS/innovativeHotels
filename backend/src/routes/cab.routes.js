@@ -14,6 +14,7 @@ router.get('/agencies', protect, getAvailableAgencies);
 router.get('/driver/profile', protect, authorize('Provider'), require('../controllers/cabDriver.controller').getDriverProfile);
 router.get('/driver/ride-requests', protect, authorize('Provider'), getRideRequests);
 router.get('/driver/rides/current', protect, authorize('Provider'), getActiveRide);
+router.get('/driver/rides/history', protect, authorize('Provider'), require('../controllers/cabDriver.controller').getRideHistory);
 router.patch('/driver/location', protect, authorize('Provider'), updateLocation);
 router.post('/driver/ride-requests/:bookingId/accept', protect, authorize('Provider'), acceptRide);
 router.patch('/driver/rides/:bookingId/status', protect, authorize('Provider'), updateRideStatus);

@@ -16,7 +16,7 @@ const ProviderDashboard = () => {
   const [allPlatformCabs, setAllPlatformCabs] = useState([]);
   const [allPlatformVehicles, setAllPlatformVehicles] = useState([]);
   const [fareRules, setFareRules] = useState([]);
-  const [metrics, setMetrics] = useState({ totalRevenue: '0.00', activeBookings: 0, pendingRequests: 0 });
+  const [metrics, setMetrics] = useState({ totalOnlineRevenue: '0.00', totalCodCollected: '0.00', activeBookings: 0, pendingRequests: 0 });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
@@ -213,9 +213,13 @@ const ProviderDashboard = () => {
     <div>
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-gray-500 text-sm font-medium mb-1">Today's Revenue</h3>
-          <p className="text-3xl font-bold text-gray-900">₹{metrics.totalRevenue}</p>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center">
+          <h3 className="text-gray-500 text-sm font-medium mb-1">Total Revenue</h3>
+          <p className="text-3xl font-bold text-gray-900">₹{(Number(metrics.totalOnlineRevenue || 0) + Number(metrics.totalCodCollected || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          <div className="flex gap-3 text-xs mt-2 text-gray-500">
+             <span><span className="text-green-600 font-semibold">₹{Number(metrics.totalOnlineRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> Online</span>
+             <span><span className="text-blue-600 font-semibold">₹{Number(metrics.totalCodCollected || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> Cash</span>
+          </div>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-500 text-sm font-medium mb-1">Active Bookings</h3>
@@ -382,6 +386,7 @@ const ProviderDashboard = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle Type</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                       </tr>
                     </thead>
@@ -402,18 +407,38 @@ const ProviderDashboard = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {booking.cabBooking?.vehicleType}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex flex-col items-start gap-1">
-                            <button
-                              disabled={booking.cabBooking?.hotelBookingId?.hotelBooking?.status === 'pending_approval'}
-                              onClick={() => {
-                                setSelectedCabRequest(booking);
-                                setAssignFormData({ vendorId: '' });
-                                setShowAssignModal(true);
-                              }}
-                              className={`bg-primary text-white px-3 py-1.5 rounded hover:bg-primary-light transition text-xs font-bold ${booking.cabBooking?.hotelBookingId?.hotelBooking?.status === 'pending_approval' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              Assign Driver
-                            </button>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-bold">
+                            ₹{booking.totalAmount}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex flex-col items-start gap-2">
+                            <div className="flex gap-2">
+                              <button
+                                disabled={booking.cabBooking?.hotelBookingId?.hotelBooking?.status === 'pending_approval'}
+                                onClick={() => {
+                                  setSelectedCabRequest(booking);
+                                  setAssignFormData({ vendorId: '' });
+                                  setShowAssignModal(true);
+                                }}
+                                className={`bg-primary text-white px-3 py-1.5 rounded hover:bg-primary-light transition text-xs font-bold ${booking.cabBooking?.hotelBookingId?.hotelBooking?.status === 'pending_approval' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                Assign Driver
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if(!window.confirm('Are you sure you want to reject this cab request?')) return;
+                                  try {
+                                    await api.patch(`/hotel-cabs/bookings/${booking._id}/status`, { status: 'rejected' });
+                                    toast.success('Request rejected successfully');
+                                    fetchData();
+                                  } catch (err) {
+                                    toast.error('Failed to reject request');
+                                  }
+                                }}
+                                className="bg-red-100 text-red-700 px-3 py-1.5 rounded hover:bg-red-200 transition text-xs font-bold"
+                              >
+                                Reject
+                              </button>
+                            </div>
                             {booking.cabBooking?.hotelBookingId?.hotelBooking?.status === 'pending_approval' && (
                               <span className="text-[10px] text-red-500 font-semibold">Approve hotel booking first</span>
                             )}
@@ -655,9 +680,15 @@ const ProviderDashboard = () => {
                 <p className="text-sm text-gray-500 mb-1">Customer</p>
                 <p className="font-semibold">{selectedCabRequest.userId?.name}</p>
               </div>
-              <div className="mb-6">
-                <p className="text-sm text-gray-500 mb-1">Requested Vehicle Type</p>
-                <p className="font-semibold">{selectedCabRequest.cabBooking?.vehicleType}</p>
+              <div className="mb-6 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Requested Vehicle Type</p>
+                  <p className="font-semibold">{selectedCabRequest.cabBooking?.vehicleType}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Estimated Fare</p>
+                  <p className="font-semibold text-green-700">₹{selectedCabRequest.totalAmount}</p>
+                </div>
               </div>
               
               <div className="mb-6">

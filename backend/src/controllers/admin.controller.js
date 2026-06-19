@@ -11,13 +11,20 @@ exports.getDashboardStats = async (req, res) => {
     const unapprovedIndependentCabs = await CabVendor.find({ status: 'pending', cabSourceType: 'INDEPENDENT' }).populate('providerId', 'name email');
     const pendingFees = await PlatformFee.find({ status: 'pending' }).populate('providerId', 'firstName lastName');
 
+    const Booking = require('../models/Booking');
+    const onlineBookings = await Booking.find({ paymentMode: 'online', paymentStatus: 'paid' });
+    const onlineRevenue = onlineBookings.reduce((sum, b) => sum + (b.platformCommission || 0), 0);
+    const pendingRevenue = pendingFees.reduce((sum, fee) => sum + (fee.amount || 0), 0);
+
     res.json({
       success: true,
       data: {
         unapprovedHotels,
         unapprovedHotelCabs,
         unapprovedIndependentCabs,
-        pendingFees
+        pendingFees,
+        onlineRevenue,
+        pendingRevenue
       }
     });
   } catch (error) {

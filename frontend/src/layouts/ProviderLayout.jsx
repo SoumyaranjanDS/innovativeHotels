@@ -108,7 +108,7 @@ const ProviderLayout = () => {
                         : 'text-gray-600 hover:bg-gray-50 hover:text-primary font-medium'
                     }`}
                   >
-                    <MapPin size={16} /> Live Rides
+                    <MapPin size={16} /> All Rides
                   </Link>
                 )}
                 <Link 

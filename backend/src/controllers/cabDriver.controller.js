@@ -206,9 +206,12 @@ exports.updateRideStatus = async (req, res) => {
 
     if (status === 'completed') {
       booking.cabBooking.completedAt = new Date();
-      booking.paymentStatus = 'cod_collected';
-      booking.codCollectedBy = vendor._id;
-      booking.codCollectedAt = new Date();
+      
+      if (booking.paymentMode === 'cod' || booking.paymentMode === 'pay_at_hotel') {
+        booking.paymentStatus = 'cod_collected';
+        booking.codCollectedBy = vendor ? vendor._id : vendorId;
+        booking.codCollectedAt = new Date();
+      }
 
       // Free up driver
       if (!isAgency && vendor) {
@@ -220,6 +223,10 @@ exports.updateRideStatus = async (req, res) => {
       const platformFeeAmount = booking.cabBooking.fareSnapshot?.platformFee || ((booking.totalAmount * 10) / 100);
       const driverEarningAmount = booking.cabBooking.fareSnapshot?.providerEarning || (booking.totalAmount - platformFeeAmount);
       
+      // Save earnings on the booking for the Earnings Dashboard
+      booking.platformCommission = platformFeeAmount;
+      booking.partnerEarning = driverEarningAmount;
+
       await PlatformFee.create({
         bookingId: booking._id,
         providerId: vendor ? vendor.providerId : vendorId,
@@ -317,3 +324,65 @@ exports.getDriverProfile = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+exports.getRideHistory = async (req, res) => {
+  try {
+    let vendorId = null;
+    const vendor = await CabVendor.findOne({ $or: [{ providerId: req.user.id }, { driverId: req.user.id }] });
+    if (vendor) {
+      vendorId = vendor._id;
+    } else {
+      const User = require('../models/User');
+      const user = await User.findById(req.user.id);
+      if (user && user.role === 'Provider' && user.providerType === 'Cab') {
+        vendorId = user._id;
+      } else {
+        return res.status(404).json({ success: false, message: 'Vendor not found' });
+      }
+    }
+
+    const limit = parseInt(req.query.limit) || 50;
+
+    const history = await Booking.find({
+      $or: [
+        { 'cabBooking.assignedCabProviderId': vendorId },
+        { 'cabBooking.vendorId': vendorId },
+        { 'cabBooking.assignedCabProviderId': req.user.id }
+      ],
+      'cabBooking.status': { $in: ['completed', 'cancelled', 'rejected'] }
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('userId', 'name email mobile')
+      .lean();
+
+    // Attach driver details and platform fee for each booking
+    const PlatformFee = require('../models/PlatformFee');
+    const User = require('../models/User');
+
+    const enriched = await Promise.all(history.map(async (booking) => {
+      let driverInfo = null;
+      const driverId = booking.cabBooking?.driverId || booking.cabBooking?.assignedDriverId;
+      if (driverId) {
+        const driver = await User.findById(driverId, 'name email mobile').lean();
+        driverInfo = driver;
+      }
+
+      // Platform fee for this booking
+      const fee = await PlatformFee.findOne({ bookingId: booking._id }).lean();
+
+      return {
+        ...booking,
+        driverInfo,
+        platformFee: fee ? fee.amount : null,
+        netAmount: fee ? (booking.totalAmount - fee.amount) : booking.totalAmount,
+      };
+    }));
+
+    res.json({ success: true, history: enriched });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+

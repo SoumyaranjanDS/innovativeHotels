@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Wallet, IndianRupee, ArrowDownToLine, Landmark, Smartphone, X, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Wallet, IndianRupee, ArrowDownToLine, Landmark, Smartphone, X, CheckCircle, Clock, XCircle, Banknote, Receipt } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const ProviderEarnings = () => {
-  const [metrics, setMetrics] = useState({ totalRevenue: 0, activeBookings: 0, pendingRequests: 0 });
+  const [metrics, setMetrics] = useState({ totalOnlineRevenue: 0, totalCodCollected: 0, totalPlatformOwed: 0, activeBookings: 0, pendingRequests: 0 });
   const [payoutMethods, setPayoutMethods] = useState({ upiId: '', bankDetails: { accountName: '', accountNumber: '', ifsc: '' } });
   const [withdrawals, setWithdrawals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +66,13 @@ const ProviderEarnings = () => {
   };
 
   const totalWithdrawnAmount = withdrawals.filter(w => w.status !== 'rejected').reduce((sum, w) => sum + w.amount, 0);
-  const availableBalance = (parseFloat(metrics.totalRevenue) || 0) - totalWithdrawnAmount;
+  const totalOnlineRevenue = parseFloat(metrics.totalOnlineRevenue) || 0;
+  const totalCodCollected = parseFloat(metrics.totalCodCollected) || 0;
+  const totalPlatformOwed = parseFloat(metrics.totalPlatformOwed) || 0;
+
+  const rawAvailableBalance = totalOnlineRevenue - totalPlatformOwed - totalWithdrawnAmount;
+  const availableBalance = rawAvailableBalance > 0 ? rawAvailableBalance : 0;
+  const amountOwedToPlatform = rawAvailableBalance < 0 ? Math.abs(rawAvailableBalance) : 0;
 
   const handleWithdrawRequest = async (e) => {
     e.preventDefault();
@@ -113,36 +119,94 @@ const ProviderEarnings = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-8 max-w-6xl mx-auto">
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-heading">Earnings Dashboard</h1>
-          <p className="text-gray-500 mt-1">Manage your revenue and payout methods</p>
+          <p className="text-gray-500 mt-1">Manage your revenue, cash collections, and payouts</p>
         </div>
-        <button 
-          onClick={() => openModal('withdraw')}
-          className="bg-primary text-white px-5 py-2.5 rounded-lg font-semibold flex items-center gap-2 hover:bg-primary-light transition shadow-sm"
-        >
-          <ArrowDownToLine size={18} />
-          Withdraw Funds
-        </button>
+        {amountOwedToPlatform > 0 ? (
+          <button 
+            onClick={() => toast.info('Payment gateway integration required to settle negative balance.')}
+            className="bg-red-500 text-white px-5 py-2.5 rounded-lg font-semibold flex items-center gap-2 hover:bg-red-600 transition shadow-sm"
+          >
+            <Wallet size={18} />
+            Pay to Platform (₹{amountOwedToPlatform.toFixed(2)})
+          </button>
+        ) : (
+          <button 
+            onClick={() => openModal('withdraw')}
+            className="bg-primary text-white px-5 py-2.5 rounded-lg font-semibold flex items-center gap-2 hover:bg-primary-light transition shadow-sm"
+          >
+            <ArrowDownToLine size={18} />
+            Withdraw Funds
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-          <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center shrink-0">
-            <Wallet size={24} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+          <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shrink-0">
+            <Wallet size={20} />
           </div>
           <div>
-            <p className="text-sm text-gray-500 font-medium">Available Balance</p>
-            <p className="text-2xl font-bold text-gray-900 flex items-center">
-              <IndianRupee size={20} className="mr-1"/>
-              {availableBalance.toFixed(2)}
+            <p className="text-sm text-gray-500 font-medium">Online Earnings</p>
+            <p className="text-2xl font-bold text-gray-900 flex items-center mt-1">
+              <IndianRupee size={20} className="mr-0.5"/>
+              {totalOnlineRevenue.toFixed(2)}
             </p>
-            <p className="text-[10px] text-gray-400 mt-1">Total Lifetime: ₹{parseFloat(metrics.totalRevenue || 0).toFixed(2)}</p>
+            <p className="text-xs text-gray-400 mt-1">Platform holds this</p>
           </div>
         </div>
 
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+          <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center shrink-0">
+            <Banknote size={20} />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 font-medium">Cash Collected (COD)</p>
+            <p className="text-2xl font-bold text-gray-900 flex items-center mt-1">
+              <IndianRupee size={20} className="mr-0.5"/>
+              {totalCodCollected.toFixed(2)}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">Cash you directly collected</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+          <div className="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center shrink-0">
+            <Receipt size={20} />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 font-medium">Platform Owed</p>
+            <p className="text-2xl font-bold text-gray-900 flex items-center mt-1">
+              <IndianRupee size={20} className="mr-0.5"/>
+              {totalPlatformOwed.toFixed(2)}
+            </p>
+            <p className="text-xs text-red-400/80 mt-1 font-medium">Commission from COD</p>
+          </div>
+        </div>
+
+        <div className={`p-6 rounded-2xl shadow-sm border flex flex-col gap-3 ${amountOwedToPlatform > 0 ? 'bg-red-50 border-red-200' : 'bg-primary/5 border-primary/20'}`}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${amountOwedToPlatform > 0 ? 'bg-red-100 text-red-600' : 'bg-primary/20 text-primary-dark'}`}>
+            <Landmark size={20} />
+          </div>
+          <div>
+            <p className={`text-sm font-medium ${amountOwedToPlatform > 0 ? 'text-red-600' : 'text-primary-dark'}`}>
+              {amountOwedToPlatform > 0 ? 'Owed to Platform' : 'Available for Withdrawal'}
+            </p>
+            <p className={`text-2xl font-bold flex items-center mt-1 ${amountOwedToPlatform > 0 ? 'text-red-700' : 'text-primary-dark'}`}>
+              <IndianRupee size={20} className="mr-0.5"/>
+              {amountOwedToPlatform > 0 ? amountOwedToPlatform.toFixed(2) : availableBalance.toFixed(2)}
+            </p>
+            <p className={`text-xs mt-1 ${amountOwedToPlatform > 0 ? 'text-red-500' : 'text-primary/70'}`}>
+              {amountOwedToPlatform > 0 ? 'Please settle negative balance' : `Withdrawn: ₹${totalWithdrawnAmount.toFixed(2)}`}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shrink-0">
             <Landmark size={24} />
@@ -164,7 +228,7 @@ const ProviderEarnings = () => {
           </div>
           <div className="flex-1">
             <p className="text-sm text-gray-500 font-medium">UPI ID</p>
-            <p className="text-gray-900 font-semibold text-sm mt-1 truncate max-w-[100px]">
+            <p className="text-gray-900 font-semibold text-sm mt-1 truncate max-w-[150px]">
               {payoutMethods.upiId || 'Not Added'}
             </p>
           </div>
@@ -273,7 +337,27 @@ const ProviderEarnings = () => {
                 <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 mb-4 text-center">
                   <p className="text-sm text-gray-600 mb-1">Available for Withdrawal</p>
                   <p className="text-3xl font-bold text-primary">₹{availableBalance.toFixed(2)}</p>
+                  
+                  <div className="mt-3 pt-3 border-t border-primary/10 text-xs text-gray-500 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span>Online Earnings:</span> 
+                      <span className="font-semibold text-gray-800">₹{totalOnlineRevenue.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-red-500">
+                      <span>Platform Fee (from COD):</span> 
+                      <span className="font-semibold">-₹{totalPlatformOwed.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-red-500">
+                      <span>Already Withdrawn:</span> 
+                      <span className="font-semibold">-₹{totalWithdrawnAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
                 </div>
+                
+                <p className="text-xs text-gray-500 italic mb-4 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                  Note: We automatically deduct the platform fees for Cash on Delivery (COD) bookings you collected directly from your online earnings balance.
+                </p>
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Amount (Min ₹5000)</label>
                   <input type="number" min="5000" max={availableBalance} required value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} className="w-full border border-gray-200 rounded-lg p-3" placeholder="5000"/>

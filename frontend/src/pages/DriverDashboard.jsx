@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Car, MapPin, Navigation, Phone, CheckCircle, Navigation2, KeyRound } from 'lucide-react';
+import { Car, MapPin, Navigation, Phone, CheckCircle, Navigation2, KeyRound, Receipt, XCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
@@ -14,6 +14,7 @@ const DriverDashboard = () => {
   const [profile, setProfile] = useState(null);
   const [vehicle, setVehicle] = useState(null);
   const [activeRide, setActiveRide] = useState(null);
+  const [historyRides, setHistoryRides] = useState([]);
   const [updating, setUpdating] = useState(false);
   
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -36,6 +37,10 @@ const DriverDashboard = () => {
       // 2. Fetch Active Ride
       const rideRes = await api.get('/cabs/driver/rides/current');
       setActiveRide(rideRes.data.activeRide);
+
+      // 3. Fetch History Rides
+      const historyRes = await api.get('/cabs/driver/rides/history');
+      setHistoryRides(historyRes.data.history || []);
 
     } catch (error) {
       console.error('Failed to load driver dashboard', error);
@@ -115,6 +120,12 @@ const DriverDashboard = () => {
   }, [isLoaded, activeRide]);
 
   const handleUpdateStatus = async (newStatus) => {
+    if (newStatus === 'completed' && (activeRide?.paymentMode === 'cod' || activeRide?.paymentMode === 'pay_at_hotel')) {
+      if (!window.confirm(`Payment Collection Required!\n\nCash to collect: ₹${activeRide.totalAmount}\n\nPlease confirm you have collected the full cash amount from the passenger.`)) {
+        return;
+      }
+    }
+    
     setUpdating(true);
     try {
       await api.patch(`/cabs/driver/rides/${activeRide._id}/status`, {
@@ -363,7 +374,10 @@ const DriverDashboard = () => {
                     <div>
                       <p className="text-xs text-blue-800 uppercase font-bold mb-1">Passenger</p>
                       <p className="font-bold text-blue-900">{activeRide.userId?.name || 'Customer'}</p>
-                      <p className="text-sm text-blue-700">{activeRide.cabBooking?.passengers} Passenger(s)</p>
+                      <p className="text-sm font-medium text-blue-800 mt-1 flex items-center gap-1">
+                        <Phone size={14} /> {activeRide.userId?.mobile || 'N/A'}
+                      </p>
+                      <p className="text-sm text-blue-700 mt-1">{activeRide.cabBooking?.passengers} Passenger(s)</p>
                     </div>
                   </div>
 
@@ -420,6 +434,66 @@ const DriverDashboard = () => {
           </div>
         </div>
 
+      </div>
+
+      {/* History Rides Section */}
+      <div className="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-800">Completed Rides</h2>
+          <span className="bg-gray-100 text-gray-600 text-sm px-3 py-1 rounded-full font-medium">{historyRides.length} Total</span>
+        </div>
+        
+        {historyRides.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 text-left text-xs uppercase font-bold text-gray-500">
+                <tr>
+                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Pickup</th>
+                  <th className="px-6 py-4">Drop</th>
+                  <th className="px-6 py-4">Fare</th>
+                  <th className="px-6 py-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {historyRides.map(ride => (
+                  <tr key={ride._id} className="hover:bg-gray-50/50 transition">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-800">
+                      {new Date(ride.cabBooking?.completedAt || ride.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-gray-700 max-w-[200px] truncate" title={ride.cabBooking?.pickupLocation?.address}>
+                        {ride.cabBooking?.pickupLocation?.address?.split(',')[0]}
+                      </p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-gray-700 max-w-[200px] truncate" title={ride.cabBooking?.dropLocation?.address}>
+                        {ride.cabBooking?.dropLocation?.address?.split(',')[0]}
+                      </p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold text-gray-800">₹{ride.totalAmount}</p>
+                      <p className="text-xs text-gray-500">{ride.paymentMode === 'cod' ? 'Cash' : 'Online'}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                        ride.cabBooking?.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {ride.cabBooking?.status === 'completed' ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                        {ride.cabBooking?.status === 'completed' ? 'Completed' : 'Cancelled'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-gray-500">
+            <Receipt className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+            <p className="text-gray-600 font-medium">No completed rides yet.</p>
+          </div>
+        )}
       </div>
 
       {/* OTP Modal */}
@@ -493,7 +567,10 @@ const ActiveTripView = ({ activeRide, driverLocation, directions, isLoaded, hand
               <div>
                 <p className="text-xs text-blue-800 uppercase font-bold mb-1">Passenger</p>
                 <p className="font-bold text-blue-900">{activeRide?.userId?.name || 'Customer'}</p>
-                <p className="text-sm text-blue-700">{activeRide?.cabBooking?.passengers} Passenger(s)</p>
+                <p className="text-sm font-medium text-blue-800 mt-1 flex items-center gap-1">
+                  <Phone size={14} /> {activeRide?.userId?.mobile || 'N/A'}
+                </p>
+                <p className="text-sm text-blue-700 mt-1">{activeRide?.cabBooking?.passengers} Passenger(s)</p>
               </div>
             </div>
 

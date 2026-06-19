@@ -51,7 +51,10 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.use(helmet());
-app.use(morgan('dev'));
+// app.use(morgan('dev')); // Disabled request logging
+
+// Routes Imports
+const paymentRoutes = require('./src/routes/payment.routes');
 
 // Database connection
 mongoose.connect(process.env.MONGO_URI)
@@ -69,6 +72,7 @@ app.use('/api/hotel-bookings', require('./src/routes/hotelBooking.routes'));
 app.use('/api/admin', require('./src/routes/admin.routes'));
 app.use('/api/upload', require('./src/routes/upload.routes'));
 app.use('/api/support', require('./src/routes/support.routes'));
+app.use('/api/payments', paymentRoutes);
 
 app.get('/', (req, res) => {
     res.send('Hotel & Cab API is running');

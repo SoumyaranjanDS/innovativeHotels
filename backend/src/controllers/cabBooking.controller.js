@@ -67,7 +67,7 @@ exports.getFareEstimate = async (req, res) => {
 // Create Cab Booking (COD)
 exports.createCabBooking = async (req, res) => {
   try {
-    const { pickupLocation, dropLocation, pickupDateTime, tripType, passengers, vehicleType, hotelBookingId, hotelId, cabSourcePreference, assignedCabProviderId } = req.body;
+    const { pickupLocation, dropLocation, pickupDateTime, tripType, passengers, vehicleType, hotelBookingId, hotelId, cabSourcePreference, assignedCabProviderId, paymentMode } = req.body;
     
     // Only check for active local rides if this is not a hotel pickup
     if (tripType !== 'pickup_to_hotel' && !hotelBookingId) {
@@ -138,8 +138,8 @@ exports.createCabBooking = async (req, res) => {
         status: 'requested',
         otp: otp
       },
-      paymentMode: 'cod',
-      paymentStatus: 'cod_pending',
+      paymentMode: paymentMode || 'cod',
+      paymentStatus: (paymentMode === 'online') ? 'paid' : 'cod_pending',
       totalAmount: grandTotal
     });
 

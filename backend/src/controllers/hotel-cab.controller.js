@@ -484,7 +484,10 @@ exports.updateCabStatus = async (req, res, next) => {
       booking = await Booking.findOne({
         _id: id,
         bookingType: 'CAB',
-        'cabBooking.assignedCabProviderId': req.user.id,
+        $or: [
+          { 'cabBooking.assignedCabProviderId': req.user.id },
+          { 'cabBooking.status': { $in: ['requested', 'external_cabs_notified'] } }
+        ]
       });
     } else {
       const hotel = await Hotel.findOne({ providerId: req.user.id });
@@ -507,12 +510,44 @@ exports.updateCabStatus = async (req, res, next) => {
 
     if (status === 'completed') {
       booking.cabBooking.completedAt = new Date();
-      if (booking.cabBooking.vendorId) {
-        const vendor = await CabVendor.findById(booking.cabBooking.vendorId);
+      
+      let vendorId = booking.cabBooking.vendorId;
+      let vendor = null;
+      if (vendorId) {
+        vendor = await CabVendor.findById(vendorId);
         if (vendor) {
           vendor.availability.isAvailable = true;
           await vendor.save();
         }
+      }
+
+      // Generate Platform Fee if not already present
+      const PlatformFee = require('../models/PlatformFee');
+      const existingFee = await PlatformFee.findOne({ bookingId: booking._id });
+      if (!existingFee) {
+        const platformFeeAmount = booking.cabBooking.fareSnapshot?.platformFee || ((booking.totalAmount * 10) / 100);
+        const driverEarningAmount = booking.cabBooking.fareSnapshot?.providerEarning || (booking.totalAmount - platformFeeAmount);
+        
+        booking.platformCommission = platformFeeAmount;
+        booking.partnerEarning = driverEarningAmount;
+
+        if (booking.paymentMode === 'cod' || booking.paymentMode === 'pay_at_hotel') {
+          booking.paymentStatus = 'cod_collected';
+          booking.codCollectedBy = vendor ? vendor._id : vendorId;
+          booking.codCollectedAt = new Date();
+        }
+
+        await PlatformFee.create({
+          bookingId: booking._id,
+          providerId: isCabAgency ? req.user.id : (vendor ? vendor.providerId : vendorId),
+          cabProviderId: vendorId,
+          driverId: vendor ? vendor.driverId : vendorId,
+          hotelId: isCabAgency ? null : (hotel ? hotel._id : null),
+          grossFare: booking.totalAmount,
+          platformFee: platformFeeAmount,
+          driverEarning: driverEarningAmount,
+          feeStatus: 'payable'
+        });
       }
     }
 

@@ -37,6 +37,12 @@ const ProviderHotelBookings = () => {
     if (status === 'rejected' && !window.confirm('Are you sure you want to reject this booking? The room will be released.')) return;
     
     if (status === 'completed' && !otp) {
+      const booking = bookings.find(b => b._id === id);
+      if (booking && (booking.paymentMode === 'pay_at_hotel' || booking.paymentMode === 'cod') && booking.paymentStatus === 'pending') {
+        if (!window.confirm(`Payment Collection Required!\n\nCash to collect: ₹${booking.totalAmount}\n\nPlease confirm that you have collected the cash from the guest before proceeding with check-out.`)) {
+          return;
+        }
+      }
       setOtpModalData({ id, type: 'checkout' });
       return;
     }
@@ -145,8 +151,8 @@ const ProviderHotelBookings = () => {
                       </td>
                       <td className="p-4">
                         <p className="font-bold text-gray-900">₹{b.totalAmount}</p>
-                        <p className={`text-xs font-semibold ${b.paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>
-                          {b.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
+                        <p className={`text-xs font-semibold ${(b.paymentStatus === 'paid' || b.paymentStatus === 'cod_collected') ? 'text-green-600' : 'text-yellow-600'}`}>
+                          {b.paymentStatus === 'paid' ? 'Paid' : b.paymentStatus === 'cod_collected' ? 'Paid (Cash)' : 'Pending'}
                         </p>
                       </td>
                       <td className="p-4">
@@ -219,7 +225,7 @@ const ProviderHotelBookings = () => {
                     <p><span className="font-semibold text-gray-800">Room Type:</span> {selectedBooking.roomType}</p>
                     <p><span className="font-semibold text-gray-800">Guests:</span> {selectedBooking.hotelBooking?.guestDetails?.guestCount || selectedBooking.hotelBooking?.guests?.adults} Adults</p>
                     <p><span className="font-semibold text-gray-800">Rooms Booked:</span> {selectedBooking.hotelBooking?.roomsCount}</p>
-                    <p><span className="font-semibold text-gray-800">Need Cab Pickup:</span> {selectedBooking.hotelBooking?.needPickupCab === 'yes' ? 'Yes' : 'No'}</p>
+                    <p><span className="font-semibold text-gray-800">Need Cab Pickup:</span> {selectedBooking.hotelBooking?.needPickupCab ? selectedBooking.hotelBooking.needPickupCab.charAt(0).toUpperCase() + selectedBooking.hotelBooking.needPickupCab.slice(1).replace('_', ' ') : 'No'}</p>
                   </div>
                 </div>
               </div>

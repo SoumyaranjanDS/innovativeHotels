@@ -13,6 +13,37 @@ exports.getMySupportTickets = async (req, res) => {
   }
 };
 
+// @desc    Create a new generic support ticket
+// @route   POST /api/support
+exports.createSupportTicket = async (req, res) => {
+  try {
+    const { subject, category, message } = req.body;
+
+    const ticket = await SupportTicket.create({
+      userId: req.user.id,
+      userModel: 'User', // Support tickets are linked to User model
+      subject: subject || 'General Query',
+      category: category || 'other',
+      message: message, // Missing root message field
+      messages: [{
+        sender: req.user.id,
+        senderModel: 'User',
+        message: message,
+        timestamp: new Date()
+      }]
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to('admin').emit('new_support_ticket', ticket);
+    }
+
+    res.status(201).json({ success: true, ticket });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Reply to a support ticket
 // @route   PATCH /api/support/:id/reply
 exports.replyToSupportTicket = async (req, res) => {

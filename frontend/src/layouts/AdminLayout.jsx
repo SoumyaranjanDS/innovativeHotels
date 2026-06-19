@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LayoutDashboard, Building2, Car, Users, CreditCard, Headphones, Settings, LogOut, ShieldCheck, Menu, X } from 'lucide-react';
 
@@ -30,8 +30,8 @@ const AdminLayout = () => {
         <div className="p-4 flex-1 flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <Link to="/" className="flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
-              <img src="/inno-logo.jpeg" alt="Innovative Hotel Solution" className="h-10 object-contain brightness-0 invert" />
-              <span className="font-heading font-bold text-sm leading-tight">Innovative</span>
+              <img src="/inno-logo.jpeg" alt="Innovative Hotel Solution" className="h-10 object-contain rounded-md" />
+              <span className="font-heading font-bold text-sm leading-tight text-white">Innovative</span>
             </Link>
             <button className="md:hidden text-white/70 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
               <X size={20} />
@@ -39,44 +39,47 @@ const AdminLayout = () => {
           </div>
 
           <nav className="space-y-0.5 flex-1">
-            <Link to="/admin/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/10 font-semibold text-sm">
+            <NavLink to="/admin/dashboard" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
               <LayoutDashboard size={16} /> Overview
-            </Link>
+            </NavLink>
 
             <div className="pt-3 pb-1 px-1 text-[10px] font-bold uppercase tracking-widest text-accent/70">Approvals</div>
-            <Link to="/admin/approvals/hotels" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-white/10 transition text-sm text-white/80">
+            <NavLink to="/admin/approvals/hotels" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
               <Building2 size={16} /> Hotel Approvals
-            </Link>
-            <Link to="/admin/approvals/cabs" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-white/10 transition text-sm text-white/80">
+            </NavLink>
+            <NavLink to="/admin/approvals/cabs" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
               <Car size={16} /> Cab Approvals
-            </Link>
+            </NavLink>
 
             <div className="pt-3 pb-1 px-1 text-[10px] font-bold uppercase tracking-widest text-accent/70">Management</div>
-            <Link to="/admin/cabs/hotel" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-white/10 transition text-sm text-white/80">
+            <NavLink to="/admin/cabs/hotel" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
               <Car size={16} /> Hotel Cabs
-            </Link>
-            <Link to="/admin/cabs/external" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-white/10 transition text-sm text-white/80">
+            </NavLink>
+            <NavLink to="/admin/cabs/external" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
               <Car size={16} /> External Cabs
-            </Link>
-            <Link to="/admin/users" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-white/10 transition text-sm text-white/80">
+            </NavLink>
+            <NavLink to="/admin/users" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
               <Users size={16} /> Users & Providers
-            </Link>
-            <Link to="/admin/bookings" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-white/10 transition text-sm text-white/80">
+            </NavLink>
+            <NavLink to="/admin/bookings" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
               <ShieldCheck size={16} /> All Bookings
-            </Link>
+            </NavLink>
 
             <div className="pt-3 pb-1 px-1 text-[10px] font-bold uppercase tracking-widest text-accent/70">Finance</div>
-            <Link to="/admin/payments" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-white/10 transition text-sm text-white/80">
+            <NavLink to="/admin/payments" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
               <CreditCard size={16} /> Payments & Refunds
-            </Link>
-            <Link to="/admin/settlements" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-white/10 transition text-sm text-white/80">
+            </NavLink>
+            <NavLink to="/admin/settlements" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
               <Settings size={16} /> Settlements
-            </Link>
+            </NavLink>
+            <NavLink to="/admin/withdrawals" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
+              <CreditCard size={16} /> Withdrawal Requests
+            </NavLink>
 
             <div className="pt-3 pb-1 px-1 text-[10px] font-bold uppercase tracking-widest text-accent/70">System</div>
-            <Link to="/admin/support" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-white/10 transition text-sm text-white/80">
+            <NavLink to="/admin/support" onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-sm ${isActive ? 'bg-white/10 font-semibold text-white' : 'text-white/80 hover:bg-white/10'}`}>
               <Headphones size={16} /> Support Tickets
-            </Link>
+            </NavLink>
           </nav>
         </div>
         <div className="p-4 border-t border-white/10 shrink-0">

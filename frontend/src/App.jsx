@@ -45,6 +45,8 @@ import HotelBookingConfirmation from './pages/HotelBookingConfirmation';
 import CustomerHotelBookingDetail from './pages/CustomerHotelBookingDetail';
 import ProviderReviews from './pages/ProviderReviews';
 import CustomerSupportDashboard from './pages/CustomerSupportDashboard';
+import ProviderSupport from './pages/ProviderSupport';
+import AdminWithdrawals from './pages/AdminWithdrawals';
 
 // Info Pages
 import Features from './pages/info/Features';
@@ -101,6 +103,7 @@ function App() {
               <Route path="documents" element={<ProviderDocuments />} />
               <Route path="earnings" element={<ProviderEarnings />} />
               <Route path="reviews" element={<ProviderReviews />} />
+              <Route path="support" element={<ProviderSupport />} />
               <Route path="cab-dashboard" element={<CabDriverDashboard />} />
               <Route path="driver-dashboard" element={<DriverDashboard />} />
             </Route>
@@ -117,6 +120,7 @@ function App() {
               <Route path="payments" element={<AdminPayments />} />
               <Route path="settlements" element={<AdminSettlements />} />
               <Route path="support" element={<AdminSupport />} />
+              <Route path="withdrawals" element={<AdminWithdrawals />} />
             </Route>
 
           </Routes>

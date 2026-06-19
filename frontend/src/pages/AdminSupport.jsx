@@ -2,19 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import { Headphones, X, Send, CheckCircle } from 'lucide-react';
 import { io } from 'socket.io-client';
+import { useAuth } from '../context/AuthContext';
 
 const AdminSupport = () => {
+  const { user: adminUser } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [chatMessage, setChatMessage] = useState('');
   const [socket, setSocket] = useState(null);
   const messagesEndRef = useRef(null);
-  const [adminUser, setAdminUser] = useState(null);
-
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    setAdminUser(user);
 
     const fetchTickets = async () => {
       try {
@@ -28,9 +26,10 @@ const AdminSupport = () => {
     };
     fetchTickets();
 
-    const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000');
+    const newSocket = io(import.meta.env.PROD ? import.meta.env.VITE_API_URL : 'http://localhost:5000');
     setSocket(newSocket);
     newSocket.emit('join_room', { role: 'admin', id: 'admin' });
+    newSocket.emit('join_support_admin');
 
     newSocket.on('new_support_ticket', (ticket) => {
       setTickets(prev => [ticket, ...prev]);
@@ -41,12 +40,33 @@ const AdminSupport = () => {
       setSelectedTicket(prev => prev?._id === updatedTicket._id ? updatedTicket : prev);
     });
 
+    newSocket.on('new_ticket_message', (updatedTicket) => {
+      setTickets(prev => prev.map(t => t._id === updatedTicket._id ? updatedTicket : t));
+      setSelectedTicket(prev => prev?._id === updatedTicket._id ? updatedTicket : prev);
+    });
+
     return () => newSocket.disconnect();
   }, []);
 
   useEffect(() => {
     if (selectedTicket && socket) {
-      socket.emit('join_ticket', { ticketId: selectedTicket._id });
+      // Join immediately if connected
+      if (socket.connected) {
+        socket.emit('join_ticket', { ticketId: selectedTicket._id });
+      }
+      
+      // Handle reconnects
+      const onConnect = () => {
+        socket.emit('join_room', { role: 'admin', id: 'admin' });
+        socket.emit('join_support_admin');
+        socket.emit('join_ticket', { ticketId: selectedTicket._id });
+      };
+      
+      socket.on('connect', onConnect);
+      
+      return () => {
+        socket.off('connect', onConnect);
+      };
     }
   }, [selectedTicket, socket]);
 
@@ -60,8 +80,8 @@ const AdminSupport = () => {
 
     socket.emit('send_ticket_message', {
       ticketId: selectedTicket._id,
-      sender: adminUser.id,
-      senderModel: 'User', // Admins are Users in schema
+      sender: adminUser?.id,
+      senderModel: 'Admin',
       message: chatMessage
     });
     setChatMessage('');
@@ -162,7 +182,7 @@ const AdminSupport = () => {
 
               {/* Chat messages */}
               {selectedTicket.messages?.map((msg, idx) => {
-                const isAdmin = msg.sender === adminUser.id;
+                const isAdmin = msg.senderModel === 'Admin';
                 return (
                   <div key={idx} className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}>
                     <span className={`text-xs text-gray-400 mb-1 ${isAdmin ? 'mr-2' : 'ml-2'}`}>

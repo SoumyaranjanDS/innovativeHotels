@@ -62,7 +62,7 @@ const AdminExternalCabsView = () => {
                   <thead className="bg-white text-gray-500 border-b border-gray-50">
                     <tr>
                       <th className="py-3 px-6 font-medium">Vehicle Details</th>
-                      <th className="py-3 px-6 font-medium">Provider Name</th>
+                      <th className="py-3 px-6 font-medium">Driver Details</th>
                       <th className="py-3 px-6 font-medium">Fuel / AC</th>
                       <th className="py-3 px-6 font-medium">Added On</th>
                       <th className="py-3 px-6 font-medium text-right">Actions</th>
@@ -76,8 +76,8 @@ const AdminExternalCabsView = () => {
                           <div className="text-xs text-gray-500 mt-0.5">{cab.details?.registrationNumber}</div>
                         </td>
                         <td className="py-4 px-6">
-                          <div className="font-medium text-gray-700">{cab.vendorId?.providerId?.name || 'Unknown Provider'}</div>
-                          <div className="text-xs text-gray-500">{cab.vendorId?.providerId?.mobile}</div>
+                          <div className="font-medium text-gray-700">{cab.vendorId?.vendorDetails?.driverName || 'Not Assigned'}</div>
+                          <div className="text-xs text-gray-500">{cab.vendorId?.vendorDetails?.mobile || 'No Mobile'}</div>
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-2">

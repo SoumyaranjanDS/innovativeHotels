@@ -9,6 +9,12 @@ module.exports = (io) => {
       console.log(`Socket ${socket.id} joined ticket room ${ticketId}`);
     });
 
+    // Join admin room for ticket notifications
+    socket.on('join_support_admin', () => {
+      socket.join('admin');
+      console.log(`Socket ${socket.id} joined support admin room`);
+    });
+
     // Send a message in a ticket
     socket.on('send_ticket_message', async (data) => {
       try {

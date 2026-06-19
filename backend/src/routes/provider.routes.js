@@ -25,4 +25,10 @@ router.put('/rooms/:id', require('../controllers/provider.controller').updateRoo
 // Reviews
 router.get('/reviews', getProviderReviews);
 
+// Withdrawals & Payouts
+router.put('/payout-methods', require('../controllers/provider.controller').updatePayoutMethods);
+router.get('/payout-methods', require('../controllers/provider.controller').getPayoutMethods);
+router.post('/withdraw', require('../controllers/provider.controller').requestWithdrawal);
+router.get('/withdrawals', require('../controllers/provider.controller').getWithdrawals);
+
 module.exports = router;

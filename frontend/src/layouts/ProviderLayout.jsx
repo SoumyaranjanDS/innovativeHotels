@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Building2, Car, FileText, Wallet, LogOut, MapPin, ClipboardList, Star, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Building2, Car, FileText, Wallet, LogOut, MapPin, ClipboardList, Star, Menu, X, Headphones } from 'lucide-react';
 
 const ProviderLayout = () => {
   const { user, logout } = useAuth();
@@ -140,6 +140,16 @@ const ProviderLayout = () => {
                   }`}
                 >
                   <Star size={16} /> Customer Reviews
+                </Link>
+                <Link 
+                  to="/provider/support" 
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition ${
+                    location.pathname === '/provider/support'
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-primary font-medium'
+                  }`}
+                >
+                  <Headphones size={16} /> Support Chat
                 </Link>
               </>
             )}

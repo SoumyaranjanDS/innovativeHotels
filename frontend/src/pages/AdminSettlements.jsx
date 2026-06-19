@@ -55,7 +55,9 @@ const AdminSettlements = () => {
                 <th className="py-4 px-6">Fee ID / Date</th>
                 <th className="py-4 px-6">Provider</th>
                 <th className="py-4 px-6">Booking Ref</th>
-                <th className="py-4 px-6">Fee Amount</th>
+                <th className="py-4 px-6">Total Fare</th>
+                <th className="py-4 px-6">Provider Earning</th>
+                <th className="py-4 px-6">Platform Fee</th>
                 <th className="py-4 px-6">Status</th>
                 <th className="py-4 px-6">Action</th>
               </tr>
@@ -75,15 +77,21 @@ const AdminSettlements = () => {
                     {fee.bookingId ? `#${fee.bookingId.bookingId.slice(-6).toUpperCase()}` : 'N/A'}
                   </td>
                   <td className="py-4 px-6 font-bold text-gray-900">
-                    ₹{fee.amount}
+                    ₹{fee.grossFare || 0}
+                  </td>
+                  <td className="py-4 px-6 font-bold text-gray-900">
+                    ₹{fee.driverEarning || 0}
+                  </td>
+                  <td className="py-4 px-6 font-bold text-primary">
+                    ₹{fee.platformFee || 0}
                   </td>
                   <td className="py-4 px-6">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${fee.status === 'collected' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {fee.status}
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${fee.feeStatus === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      {fee.feeStatus || 'pending'}
                     </span>
                   </td>
                   <td className="py-4 px-6">
-                    {fee.status === 'pending' && (
+                    {(fee.feeStatus === 'pending' || fee.feeStatus === 'payable') && (
                       <button 
                         onClick={() => handleCollectFee(fee._id)}
                         className="text-xs bg-primary text-white px-3 py-1.5 rounded hover:bg-primary-dark transition font-medium"

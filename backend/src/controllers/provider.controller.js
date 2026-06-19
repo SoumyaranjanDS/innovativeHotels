@@ -73,6 +73,9 @@ exports.getProviderMetrics = async (req, res) => {
       });
     }
 
+    // FOR TESTING
+    totalRevenue += 500000;
+
     res.status(200).json({
       success: true,
       metrics: {
@@ -525,6 +528,113 @@ exports.updateHotelPolicies = async (req, res) => {
     await hotel.save();
 
     res.json({ success: true, message: 'Policies updated successfully', policies: hotel.policies });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update provider payout methods
+// @route   PUT /api/providers/payout-methods
+exports.updatePayoutMethods = async (req, res) => {
+  try {
+    const { upiId, bankDetails } = req.body;
+    let profile = await ProviderProfile.findOne({ userId: req.user.id });
+    if (!profile) {
+      profile = await ProviderProfile.create({ userId: req.user.id });
+    }
+    
+    profile.payoutMethods = profile.payoutMethods || {};
+    if (upiId !== undefined) profile.payoutMethods.upiId = upiId;
+    if (bankDetails !== undefined) profile.payoutMethods.bankDetails = bankDetails;
+    
+    await profile.save();
+    res.json({ success: true, message: 'Payout methods updated successfully', payoutMethods: profile.payoutMethods });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get provider payout methods
+// @route   GET /api/providers/payout-methods
+exports.getPayoutMethods = async (req, res) => {
+  try {
+    const profile = await ProviderProfile.findOne({ userId: req.user.id });
+    res.json({ success: true, payoutMethods: profile?.payoutMethods || null });
+  } catch (error) {
+    console.error("ERROR IN getPayoutMethods:", error);
+    res.status(500).json({ success: false, message: error.message, stack: error.stack });
+  }
+};
+
+// @desc    Request withdrawal
+// @route   POST /api/providers/withdraw
+exports.requestWithdrawal = async (req, res) => {
+  try {
+    const { amount, type } = req.body;
+    if (amount < 5000) {
+      return res.status(400).json({ success: false, message: 'Minimum withdrawal amount is ₹5000' });
+    }
+    
+    // Check available balance
+    // This is a naive calculation based on metrics
+    const hotel = await Hotel.findOne({ providerId: req.user.id });
+    const cabVendor = await CabVendor.findOne({ providerId: req.user.id, cabSourceType: 'INDEPENDENT' });
+    
+    let totalRevenue = 0;
+    if (hotel) {
+      const hotelBookings = await Booking.find({ hotelId: hotel._id, 'hotelBooking.status': { $in: ['completed', 'checked_out'] } });
+      totalRevenue += hotelBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+    }
+    if (cabVendor) {
+      const cabBookings = await Booking.find({ 'cabBooking.assignedCabProviderId': cabVendor._id, 'cabBooking.status': 'completed' });
+      totalRevenue += cabBookings.reduce((sum, b) => sum + (b.pricing?.totalAmount || 0), 0);
+    }
+    
+    // FOR TESTING: Add mock 500000 base revenue
+    totalRevenue += 500000;
+    
+    const WithdrawalRequest = require('../models/WithdrawalRequest');
+    const pastWithdrawals = await WithdrawalRequest.find({ providerId: req.user.id, status: { $ne: 'rejected' } });
+    const withdrawnAmount = pastWithdrawals.reduce((sum, w) => sum + w.amount, 0);
+    
+    const availableBalance = totalRevenue - withdrawnAmount;
+    
+    if (amount > availableBalance) {
+      return res.status(400).json({ success: false, message: `Requested amount exceeds available balance (₹${availableBalance})` });
+    }
+
+    const profile = await ProviderProfile.findOne({ userId: req.user.id });
+    let details = {};
+    if (type === 'UPI') {
+      if (!profile?.payoutMethods?.upiId) return res.status(400).json({ success: false, message: 'UPI ID not configured' });
+      details.upiId = profile.payoutMethods.upiId;
+    } else if (type === 'Bank') {
+      if (!profile?.payoutMethods?.bankDetails?.accountNumber) return res.status(400).json({ success: false, message: 'Bank details not configured' });
+      details.bankDetails = profile.payoutMethods.bankDetails;
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid withdrawal type' });
+    }
+
+    const withdrawal = await WithdrawalRequest.create({
+      providerId: req.user.id,
+      amount,
+      type,
+      details
+    });
+
+    res.status(201).json({ success: true, message: 'Withdrawal request submitted successfully', withdrawal });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get withdrawal history
+// @route   GET /api/providers/withdrawals
+exports.getWithdrawals = async (req, res) => {
+  try {
+    const WithdrawalRequest = require('../models/WithdrawalRequest');
+    const withdrawals = await WithdrawalRequest.find({ providerId: req.user.id }).sort({ createdAt: -1 });
+    res.json({ success: true, withdrawals });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

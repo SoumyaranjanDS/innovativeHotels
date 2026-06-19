@@ -303,7 +303,7 @@ exports.getGroupedCabs = async (req, res) => {
         if (!hotelCabs[hotelName]) hotelCabs[hotelName] = [];
         hotelCabs[hotelName].push(v);
       } else if (v.cabSourceType === 'INDEPENDENT' && v.vendorId) {
-        const agencyName = v.vendorId.vendorDetails?.fleetCompanyName || v.vendorId.vendorDetails?.driverName || 'Independent Driver';
+        const agencyName = v.vendorId.providerId?.name || v.vendorId.vendorDetails?.fleetCompanyName || v.vendorId.vendorDetails?.driverName || 'Independent Driver';
         if (!externalCabs[agencyName]) externalCabs[agencyName] = [];
         externalCabs[agencyName].push(v);
       }
@@ -324,6 +324,41 @@ exports.deleteVehicle = async (req, res) => {
     const { id } = req.params;
     await Vehicle.findByIdAndDelete(id);
     res.json({ success: true, message: 'Vehicle deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getAllWithdrawals = async (req, res) => {
+  try {
+    const WithdrawalRequest = require('../models/WithdrawalRequest');
+    const withdrawals = await WithdrawalRequest.find({})
+      .populate('providerId', 'name email mobile')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, withdrawals });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateWithdrawalStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, adminNotes } = req.body;
+    const WithdrawalRequest = require('../models/WithdrawalRequest');
+    
+    const withdrawal = await WithdrawalRequest.findById(id);
+    if (!withdrawal) {
+      return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
+    }
+    
+    withdrawal.status = status;
+    if (adminNotes !== undefined) {
+      withdrawal.adminNotes = adminNotes;
+    }
+    
+    await withdrawal.save();
+    res.json({ success: true, message: 'Withdrawal status updated', withdrawal });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

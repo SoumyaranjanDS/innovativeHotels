@@ -29,4 +29,9 @@ const { getAllSupportTickets, replyToSupportTicket } = require('../controllers/a
 router.get('/support', getAllSupportTickets);
 router.patch('/support/:id', replyToSupportTicket);
 
+// Withdrawals
+const { getAllWithdrawals, updateWithdrawalStatus } = require('../controllers/admin.controller');
+router.get('/withdrawals', getAllWithdrawals);
+router.patch('/withdrawals/:id/status', updateWithdrawalStatus);
+
 module.exports = router;

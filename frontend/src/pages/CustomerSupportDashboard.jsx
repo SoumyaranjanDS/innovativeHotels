@@ -28,7 +28,7 @@ const CustomerSupportDashboard = () => {
     };
     fetchTickets();
 
-    const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000');
+    const newSocket = io(import.meta.env.PROD ? import.meta.env.VITE_API_URL : 'http://localhost:5000');
     setSocket(newSocket);
     
     if (userData?.id) {
@@ -45,9 +45,26 @@ const CustomerSupportDashboard = () => {
 
   useEffect(() => {
     if (selectedTicket && socket) {
-      socket.emit('join_ticket', { ticketId: selectedTicket._id });
+      // Join immediately if connected
+      if (socket.connected) {
+        socket.emit('join_ticket', { ticketId: selectedTicket._id });
+      }
+
+      // Handle reconnects
+      const onConnect = () => {
+        if (user?.id) {
+          socket.emit('join_room', { role: 'user', id: user.id });
+        }
+        socket.emit('join_ticket', { ticketId: selectedTicket._id });
+      };
+
+      socket.on('connect', onConnect);
+
+      return () => {
+        socket.off('connect', onConnect);
+      };
     }
-  }, [selectedTicket, socket]);
+  }, [selectedTicket, socket, user?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -151,7 +168,7 @@ const CustomerSupportDashboard = () => {
 
                   {/* Chat messages */}
                   {selectedTicket.messages?.filter(m => m.message !== selectedTicket.message).map((msg, idx) => {
-                    const isMe = msg.sender === user.id;
+                    const isMe = msg.senderModel === 'User';
                     return (
                       <div key={idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                         <span className={`text-xs text-gray-400 mb-1 font-medium ${isMe ? 'mr-2' : 'ml-2'}`}>
